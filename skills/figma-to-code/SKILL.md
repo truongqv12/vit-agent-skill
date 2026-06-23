@@ -36,6 +36,8 @@ Do not use this skill when:
 8. Reuse project components and design tokens before creating raw HTML/CSS primitives.
 9. Use absolute positioning only for icons, decorative vectors, and intentional overlays. Use flex/grid for forms, lists, cards, headers, footers, and main layout.
 10. Validate rendered UI with screenshot comparison before declaring completion.
+11. On Windows, run Python commands with `python -X utf8`.
+12. Do not inspect raw Figma JSON with `json.load(open(path))`. Use `scripts/extract_figma_ir.py`, or use `Path(path).read_text(encoding="utf-8-sig")` for any quick JSON inspection.
 
 ## Required workflow
 
@@ -86,13 +88,24 @@ Create:
 Run:
 
 ```bash
-python .agent-skills/figma-to-code/scripts/extract_figma_ir.py \
+python -X utf8 .agent-skills/figma-implement-fidelity/scripts/extract_figma_ir.py \
   --input .design-snapshots/<feature-name>/raw-output.json \
   --out .design-snapshots/<feature-name>/figma-ir.json \
   --target-node-id <nodeId>
 ```
 
 If the target node ID is unknown, run the extractor without `--target-node-id` to get a candidate summary, then re-run with the chosen target.
+
+
+On Windows, never inspect JSON with the default encoding:
+
+```bash
+# Do not use this:
+python -c "import json; data=json.load(open('.design-snapshots/<feature-name>/raw-output.json')); print(data.keys())"
+
+# Use this instead:
+python -X utf8 -c "import json, pathlib; p=pathlib.Path(r'.design-snapshots/<feature-name>/raw-output.json'); data=json.loads(p.read_text(encoding='utf-8-sig')); c=(data.get('context') or [data])[0]; print(c.get('id'), c.get('type'), c.get('name'))"
+```
 
 ### 5. Inspect the IR summary
 
@@ -155,7 +168,7 @@ Iterate until the major mismatches are fixed. If exact parity is impossible, doc
 ## Example prompt
 
 ```text
-Implement the selected Figma node in this repo using the figma-to-code skill.
+Implement the selected Figma node in this repo using the figma-implement-fidelity skill.
 
 Requirements:
 - Use the exact selected frame/component only.

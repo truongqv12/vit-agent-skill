@@ -18,6 +18,7 @@ import argparse
 import json
 import math
 import re
+import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
@@ -36,6 +37,97 @@ ROLE_PATTERNS = [
 ]
 
 TEXT_SECTION_RE = re.compile(r"^[A-ZÀ-Ỹ0-9 &/\-]{3,}$")
+
+
+def configure_stdio() -> None:
+    """Make Windows console output safer for Vietnamese text."""
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
+
+def read_json(path: str | Path) -> Any:
+    """Read JSON exported by Figma/MCP safely on Windows.
+
+    utf-8-sig handles both normal UTF-8 and UTF-8 with BOM.
+    Do not use json.load(open(path)) without encoding on Windows.
+    """
+    return json.loads(Path(path).read_text(encoding="utf-8-sig"))
+
+
+def write_json(path: str | Path, data: Any) -> None:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
+def union_bounds(nodes: List[Node]) -> Optional[Dict[str, float]]:
+    boxes = [bounds(n) for n in nodes if isinstance(n, dict) and bounds(n)]
+    boxes = [b for b in boxes if b]
+    if not boxes:
+        return None
+    min_x = min(b["x"] for b in boxes)
+    min_y = min(b["y"] for b in boxes)
+    max_x = max(b["x"] + b["width"] for b in boxes)
+    max_y = max(b["y"] + b["height"] for b in boxes)
+    return {"x": min_x, "y": min_y, "width": max_x - min_x, "height": max_y - min_y}
+
+
+def unwrap_mcp_payload(data: Any) -> Node:
+    """Normalize common MCP response wrappers into a node-like root.
+
+    figma-mcp-go tools can return either a direct node tree or a wrapper like
+    {"context": [node, ...]}. The extractor should support both so agents do
+    not write ad-hoc `python -c json.load(open(...))` inspections.
+    """
+    if not isinstance(data, dict):
+        raise SystemExit("input JSON must be an object")
+
+    if isinstance(data.get("context"), list):
+        context = [n for n in data["context"] if isinstance(n, dict)]
+        if len(context) == 1:
+            return context[0]
+        if context:
+            return {
+                "id": "mcp-context-root",
+                "name": "MCP context root",
+                "type": "FRAME",
+                "bounds": union_bounds(context) or {"x": 0, "y": 0, "width": 0, "height": 0},
+                "children": context,
+            }
+
+    # Some tools wrap the useful node under these keys.
+    for key in ("node", "document", "result", "data"):
+        value = data.get(key)
+        if isinstance(value, dict) and ("type" in value or "children" in value):
+            return value
+
+    # Figma REST `/files/:key/nodes` shape: {"nodes": {"id": {"document": ...}}}
+    nodes = data.get("nodes")
+    if isinstance(nodes, dict):
+        documents = []
+        for value in nodes.values():
+            if isinstance(value, dict):
+                doc = value.get("document")
+                if isinstance(doc, dict):
+                    documents.append(doc)
+        if len(documents) == 1:
+            return documents[0]
+        if documents:
+            return {
+                "id": "figma-rest-nodes-root",
+                "name": "Figma REST nodes root",
+                "type": "FRAME",
+                "bounds": union_bounds(documents) or {"x": 0, "y": 0, "width": 0, "height": 0},
+                "children": documents,
+            }
+
+    return data
 
 
 def bounds(node: Node) -> Optional[Dict[str, float]]:
@@ -366,7 +458,7 @@ def build_ir(root: Node, target_id: Optional[str]) -> Dict[str, Any]:
         warnings.append("Controls detected but no section titles; verify parser did not choose the wrong target.")
 
     return {
-        "version": "1.0",
+        "version": "1.1",
         "source": "figma-mcp-go-normalized",
         "target": {
             "id": target.get("id"),
@@ -395,10 +487,12 @@ def main() -> None:
     parser.add_argument("--target-node-id", default=None, help="Exact selected Figma node ID")
     args = parser.parse_args()
 
-    root = json.loads(Path(args.input).read_text(encoding="utf-8"))
+    configure_stdio()
+
+    payload = read_json(args.input)
+    root = unwrap_mcp_payload(payload)
     ir = build_ir(root, args.target_node_id)
-    Path(args.out).parent.mkdir(parents=True, exist_ok=True)
-    Path(args.out).write_text(json.dumps(ir, ensure_ascii=False, indent=2), encoding="utf-8")
+    write_json(args.out, ir)
 
     print(json.dumps({
         "target": ir["target"],
