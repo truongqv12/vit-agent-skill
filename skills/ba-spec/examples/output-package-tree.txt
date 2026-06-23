@@ -1,0 +1,11 @@
+ba-spec-output/2026-06-23__epic-cong-chung-dien-tu__story-quy-trinh-cong-chung-dien-tu-truc-tiep__cong-chung-dien-tu-truc-tiep/
+  README.md
+  feature-spec.md
+  feature-spec.html
+  figma-links.md
+  evidence/
+    figma-evidence-log.md
+  handoff/
+    dev-handoff-checklist.md
+  questions/
+    clarification-questions.md

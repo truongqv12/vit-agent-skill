@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Đặc tả tính năng: Duyệt yêu cầu hoàn tiền cho user VIP</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 text-slate-900">
+  <main class="mx-auto max-w-5xl px-6 py-8">
+    <section class="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+      <p class="text-sm font-semibold uppercase tracking-wide text-indigo-600">Business Analyst Feature Specification</p>
+      <h1 class="mt-2 text-3xl font-bold">Duyệt yêu cầu hoàn tiền cho user VIP</h1>
+      <p class="mt-2 text-slate-500">Ví dụ HTML render dùng Tailwind CDN.</p>
+    </section>
+
+    <section class="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <h2 class="text-xl font-bold">Tổng quan</h2>
+      <p class="mt-3">Tính năng cho phép Admin duyệt hoặc từ chối yêu cầu hoàn tiền của user VIP. Khi Admin duyệt, hệ thống ghi nhận trạng thái <code class="rounded bg-slate-100 px-1">approved</code>. Khi Admin từ chối, hệ thống bắt buộc nhập lý do.</p>
+    </section>
+
+    <section class="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <h2 class="text-xl font-bold">Functional requirements</h2>
+      <div class="mt-4 overflow-x-auto">
+        <table class="min-w-full divide-y divide-slate-200 text-sm">
+          <thead class="bg-slate-50"><tr><th class="px-4 py-3 text-left">ID</th><th class="px-4 py-3 text-left">Requirement</th><th class="px-4 py-3 text-left">Nguồn</th></tr></thead>
+          <tbody class="divide-y divide-slate-100">
+            <tr><td class="px-4 py-3 font-mono">FR-001</td><td class="px-4 py-3">Hệ thống phải cho phép Admin duyệt yêu cầu hoàn tiền của user VIP.</td><td class="px-4 py-3"><span class="rounded-full bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">PROVIDED</span></td></tr>
+            <tr><td class="px-4 py-3 font-mono">FR-004</td><td class="px-4 py-3">Hệ thống phải yêu cầu nhập lý do khi Admin từ chối yêu cầu.</td><td class="px-4 py-3"><span class="rounded-full bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">PROVIDED</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="mt-6 grid gap-6 md:grid-cols-2">
+      <div class="rounded-2xl border border-orange-200 bg-orange-50 p-6 shadow-sm">
+        <h2 class="text-xl font-bold text-orange-950">Assumptions</h2>
+        <p class="mt-3 text-sm">ASM-001: Trạng thái ban đầu là <code>pending_review</code>.</p>
+      </div>
+      <div class="rounded-2xl border border-rose-200 bg-rose-50 p-6 shadow-sm">
+        <h2 class="text-xl font-bold text-rose-950">Open questions</h2>
+        <p class="mt-3 text-sm">Q-001: Trạng thái ban đầu trước khi Admin xử lý là gì?</p>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

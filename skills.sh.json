@@ -1,0 +1,11 @@
+{
+  "$schema": "https://skills.sh/schemas/skills.sh.schema.json",
+  "notGrouped": "bottom",
+  "groupings": [
+    {
+      "title": "Business Analysis",
+      "description": "Skills for turning business input, Figma context, and change requests into practical Vietnamese feature specifications for dev and QA.",
+      "skills": ["ba-spec"]
+    }
+  ]
+}
