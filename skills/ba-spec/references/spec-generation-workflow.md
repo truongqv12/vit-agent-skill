@@ -75,8 +75,10 @@ A node ID alone is not enough for dev/QA handoff.
 
 ## Output location requirement
 
+Keep the output package path short. Use `ba-spec-output/YYYYMMDD/feature-slug/` by default and store Epic/Story details in metadata, not in the folder path.
+
 `feature-spec.md` and `feature-spec.html` must be created inside the package folder, for example:
 
 ```text
-ba-spec-output/2026-06-23__epic-cong-chung-dien-tu__story-quy-trinh-cong-chung-dien-tu-truc-tiep__cong-chung-dien-tu-truc-tiep/feature-spec.md
+ba-spec-output/20260623/cong-chung-dien-tu-truc-tiep/feature-spec.md
 ```

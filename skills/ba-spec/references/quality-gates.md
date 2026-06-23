@@ -43,11 +43,12 @@ Final response must state in Vietnamese:
 
 Before final response, verify:
 
-- Final deliverables are inside one package folder under `ba-spec-output/` or a user-specified output path.
-- Package folder name includes date, epic slug, story slug, and feature slug.
+- Final deliverables are inside one short package folder under `ba-spec-output/` or a user-specified output path.
+- Default package folder follows `ba-spec-output/{{YYYYMMDD}}/{{feature-slug}}/` unless the user requested another path.
+- By default, the package contains only `feature-spec.md` and `feature-spec.html`.
 - No final `feature-spec.md` or `feature-spec.html` is left as a loose root file.
-- Package `README.md` exists.
-- If Figma input exists, `figma-links.md` exists and contains every original Figma URL.
-- If Figma input exists, `evidence/figma-evidence-log.md` exists.
+- If Figma input exists, every original Figma URL is embedded as a clickable link in `feature-spec.md` and mirrored in `feature-spec.html`.
+- If Figma input exists, the Figma evidence log is embedded in `feature-spec.md` and mirrored in `feature-spec.html`.
+- Do not create `README.md`, `figma-links.md`, `evidence/`, `handoff/`, or `questions/` unless the user explicitly asked for separated companion files.
 - Temporary helper scripts/files are deleted.
 - No accidental root helper files remain: `extract_texts.py`, `generate_html.py`, `output.txt`, `extracted_texts.txt`, `figma_raw.json`, `markdown_cache.json`.

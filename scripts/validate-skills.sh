@@ -34,9 +34,6 @@ for skill_dir in "$ROOT"/skills/*; do
       "references/output-packaging-rules.md"
       "references/workspace-hygiene-rules.md"
       "references/figma-link-reference-rules.md"
-      "templates/output-package-readme.md"
-      "templates/figma-links.md"
-      "templates/figma-evidence-log.md"
       "templates/feature-spec.md"
       "templates/feature-spec.html"
     )

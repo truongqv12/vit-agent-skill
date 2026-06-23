@@ -4,7 +4,7 @@ description: Convert Vietnamese business requirements, Figma screenshots/links, 
 license: MIT
 metadata:
   author: ba-spec
-  version: "1.3.0"
+  version: "1.5.0"
 ---
 
 # ba-spec
@@ -106,31 +106,28 @@ When the user asks for deliverables, create one final package directory, not loo
 Default package path:
 
 ```text
-ba-spec-output/{{YYYY-MM-DD}}__epic-{{epic-slug}}__story-{{story-slug}}__{{feature-slug}}/
+ba-spec-output/{{YYYYMMDD}}/{{feature-slug}}/
 ```
 
-Required files inside the package:
+Do not embed full Epic and Story names in the folder path by default. Keep Epic/Story in the metadata sections inside `feature-spec.md` and `feature-spec.html`. If the user explicitly asks to group by Epic, use the optional grouped format documented in `references/output-packaging-rules.md`.
+
+### Default final deliverables
+
+By default, create **only these two user-facing files** inside the package:
 
 ```text
-README.md
 feature-spec.md
 feature-spec.html
 ```
 
-Required when Figma input exists:
+Do not create separate `README.md`, `figma-links.md`, `evidence/`, `handoff/`, `questions/`, or `change-impact-summary.md` files unless the user explicitly asks for extra companion files, debug artifacts, or separated handoff indexes.
 
-```text
-figma-links.md
-evidence/figma-evidence-log.md
-```
+All required handoff information must be embedded in the two default deliverables:
 
-Recommended supporting files:
-
-```text
-handoff/dev-handoff-checklist.md
-questions/clarification-questions.md
-change-impact-summary.md
-```
+- Figma original links and MCP evidence log: embed in `feature-spec.md` and mirror in `feature-spec.html`.
+- Dev/QA checklist: embed as a section in `feature-spec.md` and mirror in `feature-spec.html`.
+- Clarification questions: embed as `Câu hỏi mở` in `feature-spec.md` and mirror in `feature-spec.html`.
+- Epic, Story, Feature, package path, date, status, and source metadata: embed in `feature-spec.md` and mirror in `feature-spec.html`.
 
 Do not leave `feature-spec.md`, `feature-spec.html`, `extract_texts.py`, `generate_html.py`, `output.txt`, `extracted_texts.txt`, or similar helper files in the project root. If such files are accidentally created, move final deliverables into the package and delete helper files before final response.
 
@@ -171,7 +168,7 @@ After generating files, respond in Vietnamese with:
 3. Whether temporary helper files were cleaned up.
 4. Whether Figma MCP was used successfully.
 5. Count of Figma links inspected, failed, or skipped.
-6. Where clickable Figma links are stored.
+6. Confirm that original clickable Figma links are embedded in both `feature-spec.md` and `feature-spec.html`.
 7. Blocking open questions.
 8. Whether the spec passed quality gates.
 

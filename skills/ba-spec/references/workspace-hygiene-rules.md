@@ -42,17 +42,16 @@ Before final response:
 
 ## Package-local generated files
 
-These may remain because they are final deliverables:
+By default, only these may remain because they are final deliverables:
 
 ```text
 feature-spec.md
 feature-spec.html
-figma-links.md
-evidence/figma-evidence-log.md
-handoff/dev-handoff-checklist.md
-questions/clarification-questions.md
-README.md
 ```
+
+Extra package-local files such as `README.md`, `figma-links.md`, `evidence/figma-evidence-log.md`, `handoff/dev-handoff-checklist.md`, or `questions/clarification-questions.md` may remain only if the user explicitly requested separated companion files.
+
+If the user did not ask for companion files, embed that information into `feature-spec.md` and `feature-spec.html` instead of creating extra files.
 
 ## Dependency rule
 

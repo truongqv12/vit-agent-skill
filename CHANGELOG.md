@@ -1,22 +1,36 @@
 # Changelog
 
+## 1.5.0
+
+- Changed `ba-spec` default output to only two files inside the output folder: `feature-spec.md` and `feature-spec.html`.
+- Embedded Figma original links, Figma evidence log, open questions, assumptions, Dev/QA notes, and quality checklist inside the two default deliverables.
+- Marked `README.md`, `figma-links.md`, `evidence/`, `handoff/`, and `questions/` as optional companion files only when explicitly requested.
+- Kept short output folder convention: `ba-spec-output/YYYYMMDD/feature-slug/`.
+
+## 1.4.0
+
+- Shortened `ba-spec` output folder convention to `ba-spec-output/YYYYMMDD/feature-slug/`.
+- Added optional Epic grouping only when explicitly requested.
+- Added output packaging guide.
+
 ## 1.3.0
 
-- Added required output package convention under `ba-spec-output/YYYY-MM-DD__epic-...__story-...__feature.../`.
-- Added workspace hygiene rules: helper scripts/temp files must be created in tmp and deleted before final response.
-- Added `figma-links.md` template and mandatory preservation of clickable original Figma URLs for dev/QA handoff.
-- Added package README template and package/output quality gates.
-- Updated Markdown/HTML templates to include Figma link index and package metadata.
+- Added output packaging rules.
+- Added workspace hygiene rules.
+- Required original Figma links to be preserved for dev/QA.
+- Added cleanup expectations for temporary helper scripts.
 
 ## 1.2.0
 
-- Restructured repository as a multi-skill collection under `skills/`.
+- Converted repository to multi-skill structure under `skills/`.
+- Added Mermaid.js support in HTML template.
 - Added root `README.md`, `AGENTS.md`, `skills.sh.json`, `.gitignore`, and `LICENSE`.
-- Updated `ba-spec` HTML template to render Mermaid diagrams using Mermaid.js CDN.
-- Added source fallback for diagrams when CDN is blocked.
 
 ## 1.1.0
 
-- Converted `ba-spec` to router-style `SKILL.md` plus `references/`.
-- Added mandatory Figma MCP evidence gate.
-- Added BA practice research and skill architecture research docs.
+- Refactored `ba-spec` into router-style `SKILL.md` plus `references/` rule files.
+- Added Figma MCP evidence gate.
+
+## 1.0.0
+
+- Initial `ba-spec` skill.

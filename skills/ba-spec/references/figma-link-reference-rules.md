@@ -4,23 +4,31 @@ Use these rules whenever the input contains Figma URLs.
 
 ## Core rule
 
-Every original Figma URL provided by the user must be preserved as a clickable reference in the final package. Do not replace original URLs with only node IDs.
+Every original Figma URL provided by the user must be preserved as a clickable reference in the final deliverables. Do not replace original URLs with only node IDs.
 
-## Required output files
+## Default output location
 
-If Figma input exists, create:
+Do not create `figma-links.md` or `evidence/figma-evidence-log.md` by default.
 
-```text
-figma-links.md
-evidence/figma-evidence-log.md
-```
-
-Also include Figma reference tables inside:
+Instead, include Figma reference tables inside both default deliverables:
 
 ```text
 feature-spec.md
 feature-spec.html
 ```
+
+Create separate `figma-links.md` or `evidence/figma-evidence-log.md` only when the user explicitly asks for separated companion files or debug/evidence artifacts.
+
+## Required sections inside feature-spec.md
+
+If Figma input exists, `feature-spec.md` must include:
+
+1. `Danh sách link Figma gốc`
+2. `Nhật ký bằng chứng Figma`
+
+## Required sections inside feature-spec.html
+
+If Figma input exists, `feature-spec.html` must mirror the same information with clickable links.
 
 ## Required fields
 
@@ -59,4 +67,4 @@ Use this format in HTML:
 
 ## Dev handoff expectation
 
-Dev and QA must be able to open the original design links directly from the spec package.
+Dev and QA must be able to open the original design links directly from the Markdown and HTML spec.

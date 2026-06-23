@@ -24,10 +24,7 @@ Features:
 - Output tiếng Việt.
 - Markdown là source of truth.
 - HTML dùng Tailwind CDN và Mermaid.js CDN.
-- Output được đóng gói vào thư mục `ba-spec-output/YYYY-MM-DD__epic-...__story-...__feature.../`.
 - Có Figma MCP hard gate: không được claim đã phân tích Figma nếu không có evidence log.
-- Giữ nguyên link Figma gốc trong `figma-links.md`, `feature-spec.md`, và HTML.
-- Helper scripts/temp files phải tạo trong tmp và xóa trước final response.
 - Hỗ trợ new feature và feature upgrade.
 
 ## Repository Structure
@@ -52,33 +49,33 @@ README.md
 ### List skills in this repo
 
 ```bash
-npx skills add <your-github-user>/<your-repo> --list
+npx skills add truongqv12/vit-agent-skill --list
 ```
 
 ### Install only `ba-spec`
 
 ```bash
-npx skills add <your-github-user>/<your-repo> --skill ba-spec
+npx skills add truongqv12/vit-agent-skill --skill ba-spec
 ```
 
 ### Install globally
 
 ```bash
-npx skills add <your-github-user>/<your-repo> --skill ba-spec -g
+npx skills add truongqv12/vit-agent-skill --skill ba-spec -g
 ```
 
 ### Install for a specific agent
 
 ```bash
-npx skills add <your-github-user>/<your-repo> --skill ba-spec -a claude-code
-npx skills add <your-github-user>/<your-repo> --skill ba-spec -a codex
-npx skills add <your-github-user>/<your-repo> --skill ba-spec -a antigravity
+npx skills add truongqv12/vit-agent-skill --skill ba-spec -a claude-code
+npx skills add truongqv12/vit-agent-skill --skill ba-spec -a codex
+npx skills add truongqv12/vit-agent-skill --skill ba-spec -a antigravity
 ```
 
 ### Install all skills from this repo later
 
 ```bash
-npx skills add <your-github-user>/<your-repo> --skill '*'
+npx skills add truongqv12/vit-agent-skill --skill '*'
 ```
 
 ## Use
