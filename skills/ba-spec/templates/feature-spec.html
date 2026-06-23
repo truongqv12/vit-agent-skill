@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Đặc tả tính năng: {{FEATURE_NAME}}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: 'neutral',
+          securityLevel: 'strict',
+          flowchart: { htmlLabels: true, curve: 'basis' },
+          sequence: { mirrorActors: false },
+          themeVariables: { fontFamily: 'Inter, ui-sans-serif, system-ui, Segoe UI, sans-serif' }
+        });
+      }
+    });
+  </script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'ui-sans-serif', 'system-ui', 'Segoe UI', 'sans-serif'],
+            mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+      width: 100%;
+      overflow-x: auto;
+    }
+    details > summary { cursor: pointer; }
+
+    @media print {
+      .no-print { display: none !important; }
+      .print-break-inside-avoid { break-inside: avoid; }
+      body { background: #fff !important; }
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 antialiased">
+  <header class="border-b border-slate-200 bg-white">
+    <div class="mx-auto max-w-7xl px-6 py-8">
+      <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+          <p class="text-sm font-semibold uppercase tracking-wide text-indigo-600">Business Analyst Feature Specification</p>
+          <h1 class="mt-2 text-3xl font-bold tracking-tight text-slate-950 md:text-4xl">{{FEATURE_NAME}}</h1>
+          <p class="mt-2 text-sm text-slate-500">Source of truth: <code class="rounded bg-slate-100 px-1 py-0.5">feature-spec.md</code>. HTML chỉ dùng để review/gửi team.</p>
+        </div>
+        <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm shadow-sm">
+          <div><span class="font-medium text-slate-500">Version:</span> {{VERSION}}</div>
+          <div><span class="font-medium text-slate-500">Status:</span> {{STATUS}}</div>
+          <div><span class="font-medium text-slate-500">Updated:</span> {{UPDATED_DATE}}</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="mx-auto grid max-w-7xl gap-6 px-6 py-8 lg:grid-cols-[280px_1fr]">
+    <aside class="no-print lg:sticky lg:top-6 lg:self-start">
+      <nav class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 class="text-sm font-bold uppercase tracking-wide text-slate-500">Mục lục</h2>
+        <ol class="mt-4 space-y-2 text-sm text-slate-700">
+          <li><a class="hover:text-indigo-600" href="#metadata">1. Metadata</a></li>
+          <li><a class="hover:text-indigo-600" href="#input">2. Tóm tắt đầu vào</a></li>
+          <li><a class="hover:text-indigo-600" href="#evidence">3. Nhật ký bằng chứng</a></li>
+          <li><a class="hover:text-indigo-600" href="#figma-links">3.1. Link Figma gốc</a></li>
+          <li><a class="hover:text-indigo-600" href="#overview">4. Tổng quan</a></li>
+          <li><a class="hover:text-indigo-600" href="#goals">4. Mục tiêu</a></li>
+          <li><a class="hover:text-indigo-600" href="#scope">5. Phạm vi</a></li>
+          <li><a class="hover:text-indigo-600" href="#roles">6. Vai trò</a></li>
+          <li><a class="hover:text-indigo-600" href="#flow">7. Luồng nghiệp vụ</a></li>
+          <li><a class="hover:text-indigo-600" href="#requirements">8. Requirements</a></li>
+          <li><a class="hover:text-indigo-600" href="#rules">9. Business rules</a></li>
+          <li><a class="hover:text-indigo-600" href="#data">10. Data & validation</a></li>
+          <li><a class="hover:text-indigo-600" href="#permissions">11. Permissions</a></li>
+          <li><a class="hover:text-indigo-600" href="#states">12. State transition</a></li>
+          <li><a class="hover:text-indigo-600" href="#diagrams">12.1. Sơ đồ</a></li>
+          <li><a class="hover:text-indigo-600" href="#acceptance">13. Acceptance criteria</a></li>
+          <li><a class="hover:text-indigo-600" href="#questions">14. Assumptions & questions</a></li>
+          <li><a class="hover:text-indigo-600" href="#traceability">15. Traceability</a></li>
+          <li><a class="hover:text-indigo-600" href="#handoff">16. Handoff</a></li>
+        </ol>
+      </nav>
+    </aside>
+
+    <main class="space-y-6">
+      <section id="metadata" class="print-break-inside-avoid rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 class="text-xl font-bold text-slate-950">1. Metadata tài liệu</h2>
+        <dl class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div class="rounded-xl bg-slate-50 p-4"><dt class="text-xs font-semibold uppercase text-slate-500">Document ID</dt><dd class="mt-1 font-medium">{{DOC_ID}}</dd></div>
+          <div class="rounded-xl bg-slate-50 p-4"><dt class="text-xs font-semibold uppercase text-slate-500">Loại tính năng</dt><dd class="mt-1 font-medium">{{FEATURE_TYPE}}</dd></div>
+          <div class="rounded-xl bg-slate-50 p-4"><dt class="text-xs font-semibold uppercase text-slate-500">Owner</dt><dd class="mt-1 font-medium">{{OWNER}}</dd></div>
+          <div class="rounded-xl bg-slate-50 p-4"><dt class="text-xs font-semibold uppercase text-slate-500">Stakeholder</dt><dd class="mt-1 font-medium">{{STAKEHOLDER}}</dd></div>
+          <div class="rounded-xl bg-slate-50 p-4"><dt class="text-xs font-semibold uppercase text-slate-500">Ngày tạo</dt><dd class="mt-1 font-medium">{{CREATED_DATE}}</dd></div>
+          <div class="rounded-xl bg-slate-50 p-4"><dt class="text-xs font-semibold uppercase text-slate-500">Release</dt><dd class="mt-1 font-medium">{{TARGET_RELEASE}}</dd></div>
+          <div class="rounded-xl bg-slate-50 p-4"><dt class="text-xs font-semibold uppercase text-slate-500">Epic</dt><dd class="mt-1 font-medium">{{EPIC_NAME}}</dd></div>
+          <div class="rounded-xl bg-slate-50 p-4"><dt class="text-xs font-semibold uppercase text-slate-500">Story</dt><dd class="mt-1 font-medium">{{STORY_NAME}}</dd></div>
+          <div class="rounded-xl bg-slate-50 p-4 lg:col-span-3"><dt class="text-xs font-semibold uppercase text-slate-500">Output package</dt><dd class="mt-1 font-mono text-xs text-slate-700">{{PACKAGE_PATH}}</dd></div>
+        </dl>
+      </section>
+
+      <section id="input" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 class="text-xl font-bold text-slate-950">2. Tóm tắt đầu vào</h2>
+        <div class="mt-4 overflow-x-auto">
+          <table class="min-w-full divide-y divide-slate-200 text-sm">
+            <thead class="bg-slate-50"><tr><th class="px-4 py-3 text-left font-semibold">Loại input</th><th class="px-4 py-3 text-left font-semibold">Có/Không</th><th class="px-4 py-3 text-left font-semibold">Ghi chú</th></tr></thead>
+            <tbody class="divide-y divide-slate-100">{{INPUT_ROWS}}</tbody>
+          </table>
+        </div>
+        <div class="mt-5 flex flex-wrap gap-2 text-xs font-semibold">
+          <span class="rounded-full bg-blue-50 px-3 py-1 text-blue-700 ring-1 ring-blue-200">PROVIDED</span>
+          <span class="rounded-full bg-fuchsia-50 px-3 py-1 text-fuchsia-700 ring-1 ring-fuchsia-200">FIGMA</span>
+          <span class="rounded-full bg-emerald-50 px-3 py-1 text-emerald-700 ring-1 ring-emerald-200">FILE</span>
+          <span class="rounded-full bg-amber-50 px-3 py-1 text-amber-700 ring-1 ring-amber-200">INFERRED</span>
+          <span class="rounded-full bg-orange-50 px-3 py-1 text-orange-700 ring-1 ring-orange-200">ASSUMPTION</span>
+          <span class="rounded-full bg-rose-50 px-3 py-1 text-rose-700 ring-1 ring-rose-200">OPEN_QUESTION</span>
+        </div>
+      </section>
+
+      <section id="evidence" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 class="text-xl font-bold text-slate-950">3. Nhật ký bằng chứng</h2>
+        <p class="mt-2 text-sm text-slate-600">Bắt buộc ghi rõ trạng thái xử lý nguồn, đặc biệt với Figma URL. Không được claim đã phân tích Figma nếu không có bằng chứng MCP/screenshot/exported frame.</p>
+        <div class="mt-4 overflow-x-auto">{{EVIDENCE_TABLE}}</div>
+        <h3 class="mt-6 font-semibold text-slate-900">Nhật ký bằng chứng Figma</h3>
+        <div class="mt-3 overflow-x-auto">{{FIGMA_EVIDENCE_TABLE}}</div>
+      </section>
+
+
+
+      <section id="figma-links" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <h2 class="text-xl font-bold text-slate-950">3.1. Danh mục link Figma gốc</h2>
+          <span class="w-fit rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700 ring-1 ring-violet-200">Design references</span>
+        </div>
+        <p class="mt-2 text-sm text-slate-600">Bảng này giữ nguyên link Figma người dùng cung cấp để dev/QA/PO mở lại thiết kế gốc. Không chỉ ghi node-id.</p>
+        <div class="mt-4 overflow-x-auto">
+          <table class="min-w-full divide-y divide-slate-200 text-sm">
+            <thead class="bg-slate-50">
+              <tr>
+                <th class="px-4 py-3 text-left font-semibold text-slate-700">ID</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-700">Label</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-700">Bước nghiệp vụ</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-700">Link Figma</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-700">Kết quả MCP</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-700">Ghi chú</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">{{FIGMA_LINK_ROWS}}</tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="overview" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 class="text-xl font-bold text-slate-950">4. Tổng quan tính năng</h2>
+        <div class="prose prose-slate mt-4 max-w-none">{{OVERVIEW_HTML}}</div>
+      </section>
+
+      <section id="goals" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 class="text-xl font-bold text-slate-950">4. Mục tiêu nghiệp vụ</h2>
+        <div class="mt-4 overflow-x-auto">{{GOALS_TABLE}}</div>
+      </section>
+
+      <section id="scope" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 class="text-xl font-bold text-slate-950">5. Phạm vi</h2>
+        <div class="mt-4 grid gap-4 md:grid-cols-2">
+          <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-4"><h3 class="font-semibold text-emerald-900">Trong phạm vi</h3><div class="mt-3 text-sm">{{IN_SCOPE_HTML}}</div></div>
+          <div class="rounded-xl border border-rose-200 bg-rose-50 p-4"><h3 class="font-semibold text-rose-900">Ngoài phạm vi</h3><div class="mt-3 text-sm">{{OUT_SCOPE_HTML}}</div></div>
+        </div>
+      </section>
+
+      <section id="roles" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 class="text-xl font-bold text-slate-950">6. Stakeholder và vai trò</h2>
+        <div class="mt-4 overflow-x-auto">{{ROLES_TABLE}}</div>
+      </section>
+
+      <section id="flow" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 class="text-xl font-bold text-slate-950">7. Luồng nghiệp vụ</h2>
+        <div class="mt-4 overflow-x-auto">{{FLOW_TABLE}}</div>
+        <div class="mt-5 rounded-xl border border-slate-200 bg-white p-4">
+          <h3 class="mb-3 font-semibold text-slate-900">Sơ đồ luồng nghiệp vụ</h3>
+          <div class="mermaid">{{MERMAID_FLOW}}</div>
+          <details class="mt-4 rounded-lg bg-slate-50 p-3 text-sm">
+            <summary class="font-medium text-slate-700">Xem Mermaid source</summary>
+            <pre class="mt-3 overflow-x-auto rounded-lg bg-slate-950 p-4 text-xs text-slate-100"><code>{{MERMAID_FLOW}}</code></pre>
+          </details>
+        </div>
+      </section>
+
+      <section id="requirements" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 class="text-xl font-bold text-slate-950">8. Functional requirements</h2>
+        <div class="mt-4 overflow-x-auto">{{FR_TABLE}}</div>
+      </section>
+
+      <section id="rules" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 class="text-xl font-bold text-slate-950">9. Business rules</h2>
+        <div class="mt-4 overflow-x-auto">{{BR_TABLE}}</div>
+      </section>
+
+      <section id="data" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 class="text-xl font-bold text-slate-950">10. Data requirements & validation</h2>
+        <div class="mt-4 space-y-4">{{DATA_VALIDATION_HTML}}</div>
+      </section>
+
+      <section id="permissions" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 class="text-xl font-bold text-slate-950">11. Permission matrix</h2>
+        <div class="mt-4 overflow-x-auto">{{PERMISSION_TABLE}}</div>
+      </section>
+
+      <section id="states" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 class="text-xl font-bold text-slate-950">12. State transition</h2>
+        <div class="mt-4 overflow-x-auto">{{STATE_TABLE}}</div>
+      </section>
+
+      <section id="diagrams" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 class="text-xl font-bold text-slate-950">12.1. Sơ đồ nghiệp vụ / trạng thái</h2>
+        <p class="mt-2 text-sm text-slate-600">Các sơ đồ Mermaid được render trực tiếp bằng Mermaid.js CDN. Nếu trình duyệt chặn CDN, mở phần source để đọc hoặc copy vào Mermaid Live Editor.</p>
+        <div class="mt-5 grid gap-5">
+          <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <h3 class="font-semibold text-slate-900">State diagram</h3>
+            <div class="mt-3 mermaid">{{MERMAID_STATE_DIAGRAM}}</div>
+            <details class="mt-4 rounded-lg bg-white p-3 text-sm">
+              <summary class="font-medium text-slate-700">Xem Mermaid source</summary>
+              <pre class="mt-3 overflow-x-auto rounded-lg bg-slate-950 p-4 text-xs text-slate-100"><code>{{MERMAID_STATE_DIAGRAM}}</code></pre>
+            </details>
+          </div>
+          <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <h3 class="font-semibold text-slate-900">Sơ đồ bổ sung</h3>
+            <div class="mt-3 mermaid">{{MERMAID_ADDITIONAL_DIAGRAMS}}</div>
+            <details class="mt-4 rounded-lg bg-white p-3 text-sm">
+              <summary class="font-medium text-slate-700">Xem Mermaid source</summary>
+              <pre class="mt-3 overflow-x-auto rounded-lg bg-slate-950 p-4 text-xs text-slate-100"><code>{{MERMAID_ADDITIONAL_DIAGRAMS}}</code></pre>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <section id="acceptance" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 class="text-xl font-bold text-slate-950">13. Acceptance criteria</h2>
+        <div class="mt-4 overflow-x-auto">{{AC_TABLE}}</div>
+        <pre class="mt-4 overflow-x-auto rounded-xl bg-slate-950 p-4 text-sm text-slate-100"><code>{{GHERKIN_SCENARIOS}}</code></pre>
+      </section>
+
+      <section id="questions" class="grid gap-6 md:grid-cols-2">
+        <div class="rounded-2xl border border-orange-200 bg-orange-50 p-6 shadow-sm">
+          <h2 class="text-xl font-bold text-orange-950">14. Assumptions</h2>
+          <div class="mt-4 overflow-x-auto">{{ASSUMPTIONS_TABLE}}</div>
+        </div>
+        <div class="rounded-2xl border border-rose-200 bg-rose-50 p-6 shadow-sm">
+          <h2 class="text-xl font-bold text-rose-950">15. Open questions</h2>
+          <div class="mt-4 overflow-x-auto">{{OPEN_QUESTIONS_TABLE}}</div>
+        </div>
+      </section>
+
+      <section id="traceability" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 class="text-xl font-bold text-slate-950">16. Traceability matrix</h2>
+        <div class="mt-4 overflow-x-auto">{{TRACEABILITY_TABLE}}</div>
+      </section>
+
+      <section id="handoff" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 class="text-xl font-bold text-slate-950">17. Dev / QA handoff</h2>
+        <div class="mt-4 grid gap-4 md:grid-cols-2">
+          <div class="rounded-xl bg-slate-50 p-4"><h3 class="font-semibold">Ghi chú cho dev</h3><div class="mt-2 text-sm">{{DEV_NOTES}}</div></div>
+          <div class="rounded-xl bg-slate-50 p-4"><h3 class="font-semibold">Ghi chú cho QA</h3><div class="mt-2 text-sm">{{QA_NOTES}}</div></div>
+        </div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

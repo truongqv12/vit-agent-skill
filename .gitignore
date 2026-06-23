@@ -63,8 +63,7 @@ GoogleService-Info.plist
 # Generated Outputs & Reports
 # =========================
 output/
-feature-spec.md
-feature-spec.html
+ba-spec-output/
 figma-evidence-log.md
 change-impact-summary.md
 repomix-output.xml
@@ -111,3 +110,4 @@ claude/skills/ai-multimodal/assets/demo-*.claude/session-state/*.tmp
 assets/
 external/
 worktrees/
+skills-lock.json
