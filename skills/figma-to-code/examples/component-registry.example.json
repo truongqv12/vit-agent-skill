@@ -1,0 +1,24 @@
+{
+  "Button/Primary": {
+    "import": "@/components/ui/button",
+    "component": "Button",
+    "props": { "variant": "primary" }
+  },
+  "Button/Secondary": {
+    "import": "@/components/ui/button",
+    "component": "Button",
+    "props": { "variant": "secondary" }
+  },
+  "Input/Text": {
+    "import": "@/components/ui/input",
+    "component": "Input"
+  },
+  "Select/Default": {
+    "import": "@/components/ui/select",
+    "component": "Select"
+  },
+  "Dialog/Modal": {
+    "import": "@/components/ui/dialog",
+    "component": "Dialog"
+  }
+}
