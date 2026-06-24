@@ -38,55 +38,6 @@ Do not use this skill when:
 10. Validate rendered UI with screenshot comparison before declaring completion.
 11. On Windows, run Python commands with `python -X utf8`.
 12. Do not inspect raw Figma JSON with `json.load(open(path))`. Use `scripts/extract_figma_ir.py`, or use `Path(path).read_text(encoding="utf-8-sig")` for any quick JSON inspection.
-13. Do not ignore `VECTOR` or `RECTANGLE` nodes. In flattened Figma exports, these often represent real UI surfaces: backgrounds, cards, inputs, buttons, badges, overlays, and dividers.
-14. If a node has `renderHint: "css-box"`, implement it as a DOM/CSS box or map it to a project component. Do not treat it as a decorative SVG.
-15. If a node has `renderHint: "svg-or-icon"`, keep it as an icon/SVG asset or use an existing icon component. Do not use its fill/stroke as a parent element background.
-16. Read `compositeControls` before writing form/button code. These pair background vectors with contained text/icon nodes.
-
-
-### Vector-as-box interpretation
-
-Many Figma/MCP dumps flatten normal UI elements as `VECTOR`. The extractor preserves those nodes in three places:
-
-- `shapePrimitives`: every visible vector/shape with its `role`, `renderHint`, bounds, and CSS.
-- `semanticNodes`: all filtered nodes, including shape nodes with `css`.
-- `compositeControls`: inferred controls/buttons/badges created by pairing a CSS-box vector with text/icon nodes inside it.
-
-Implementation rules:
-
-```txt
-renderHint = "css-box"     → DOM/CSS box, component surface, input border, button background, card, badge, overlay
-renderHint = "css-divider" → border/divider
-renderHint = "svg-or-icon" → icon/SVG asset, not a layout background
-renderHint = "text"        → text node
-```
-
-Never discard a `VECTOR` only because its name is `Vector`. First check `role`, `renderHint`, and `css`.
-
-When writing code, process IR in this order:
-
-```txt
-summary
-tokens
-layout
-compositeControls
-shapePrimitives
-semanticNodes
-```
-
-If `shapePrimitives` contains CSS boxes with `backgroundColor` or `borderColor`, those styles must be represented in the generated UI. Typical mappings:
-
-```txt
-role = overlay       → fixed/absolute overlay background
-role = modal-surface → modal/dialog container background
-role = surface       → page/card/upload area/table surface
-role = control-box   → input/select/date-picker shell
-role = button-bg     → button component/background
-role = badge         → chip/status badge
-role = divider       → border line
-```
-
-If a vector UI box is missing radius/effects, do not invent large values. Use a conservative project default and add a note that the MCP serializer may need to export `cornerRadius`, `effects`, `strokeWeight`, and `opacity`.
 
 ## Required workflow
 
@@ -137,7 +88,7 @@ Create:
 Run:
 
 ```bash
-python -X utf8 .agent-skills/figma-to-code/scripts/extract_figma_ir.py \
+python -X utf8 .agent-skills/figma-implement-fidelity/scripts/extract_figma_ir.py \
   --input .design-snapshots/<feature-name>/raw-output.json \
   --out .design-snapshots/<feature-name>/figma-ir.json \
   --target-node-id <nodeId>
@@ -217,7 +168,7 @@ Iterate until the major mismatches are fixed. If exact parity is impossible, doc
 ## Example prompt
 
 ```text
-Implement the selected Figma node in this repo using the figma-to-code skill.
+Implement the selected Figma node in this repo using the figma-implement-fidelity skill.
 
 Requirements:
 - Use the exact selected frame/component only.

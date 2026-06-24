@@ -2,16 +2,15 @@
 """
 Normalize a figma-mcp-go style JSON dump into a smaller implementation IR.
 
-v1.2 changes:
-- Treat rectangular VECTOR/RECTANGLE nodes as visual boxes, not just icons.
-- Preserve shape CSS (`backgroundColor`, `borderColor`, `borderWidth`, etc.) in `css`.
-- Add `renderHint` so agents know whether a VECTOR should become a CSS box, divider, icon, or SVG asset.
-- Add `compositeControls` to pair background vectors with contained text/icon nodes.
-- Read UTF-8/UTF-8-BOM safely on Windows.
+Goals:
+- keep only one selected target frame/component/instance subtree
+- remove hidden, opacity-zero, off-canvas, and unrelated sibling nodes
+- classify semantic UI roles such as modal/header/footer/field/button/icon
+- summarize tokens/layout so the coding agent does not need to read raw output
 
 Usage:
-  python -X utf8 extract_figma_ir.py --input raw-output.json --out figma-ir.json --target-node-id 5675:288345
-  python -X utf8 extract_figma_ir.py --input raw-output.json --out figma-ir.json
+  python extract_figma_ir.py --input raw-output.json --out figma-ir.json --target-node-id 5675:288345
+  python extract_figma_ir.py --input raw-output.json --out figma-ir.json
 """
 from __future__ import annotations
 
@@ -20,16 +19,14 @@ import json
 import math
 import re
 import sys
-from collections import Counter
+from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 Node = Dict[str, Any]
-Bounds = Dict[str, float]
 
 CONTAINER_TYPES = {"FRAME", "GROUP", "COMPONENT", "COMPONENT_SET", "INSTANCE", "SECTION"}
-SHAPE_TYPES = {"VECTOR", "RECTANGLE", "ELLIPSE", "LINE", "POLYGON", "STAR", "BOOLEAN_OPERATION"}
-VISIBLE_TYPES = CONTAINER_TYPES | SHAPE_TYPES | {"TEXT"}
+VISIBLE_TYPES = CONTAINER_TYPES | {"TEXT", "VECTOR", "RECTANGLE", "ELLIPSE", "LINE", "POLYGON", "STAR", "BOOLEAN_OPERATION"}
 
 ROLE_PATTERNS = [
     ("close-button", re.compile(r"close|dismiss|x$|đóng", re.I)),
@@ -63,31 +60,78 @@ def read_json(path: str | Path) -> Any:
 def write_json(path: str | Path, data: Any) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    path.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
 
 
-def unwrap_mcp_payload(payload: Any) -> Node:
-    """Accept raw node JSON or common MCP wrapper shapes."""
-    if isinstance(payload, dict):
-        context = payload.get("context")
-        if isinstance(context, list) and context:
-            first = context[0]
-            if isinstance(first, dict):
-                return first
-        node = payload.get("node")
-        if isinstance(node, dict):
-            return node
-        data = payload.get("data")
-        if isinstance(data, dict):
-            return unwrap_mcp_payload(data)
-        return payload
-    if isinstance(payload, list) and payload and isinstance(payload[0], dict):
-        return payload[0]
-    raise SystemExit("Unsupported Figma/MCP JSON payload shape")
+def union_bounds(nodes: List[Node]) -> Optional[Dict[str, float]]:
+    boxes = [bounds(n) for n in nodes if isinstance(n, dict) and bounds(n)]
+    boxes = [b for b in boxes if b]
+    if not boxes:
+        return None
+    min_x = min(b["x"] for b in boxes)
+    min_y = min(b["y"] for b in boxes)
+    max_x = max(b["x"] + b["width"] for b in boxes)
+    max_y = max(b["y"] + b["height"] for b in boxes)
+    return {"x": min_x, "y": min_y, "width": max_x - min_x, "height": max_y - min_y}
 
 
-def bounds(node: Node) -> Optional[Bounds]:
-    b = node.get("bounds")
+def unwrap_mcp_payload(data: Any) -> Node:
+    """Normalize common MCP response wrappers into a node-like root.
+
+    figma-mcp-go tools can return either a direct node tree or a wrapper like
+    {"context": [node, ...]}. The extractor should support both so agents do
+    not write ad-hoc `python -c json.load(open(...))` inspections.
+    """
+    if not isinstance(data, dict):
+        raise SystemExit("input JSON must be an object")
+
+    if isinstance(data.get("context"), list):
+        context = [n for n in data["context"] if isinstance(n, dict)]
+        if len(context) == 1:
+            return context[0]
+        if context:
+            return {
+                "id": "mcp-context-root",
+                "name": "MCP context root",
+                "type": "FRAME",
+                "bounds": union_bounds(context) or {"x": 0, "y": 0, "width": 0, "height": 0},
+                "children": context,
+            }
+
+    # Some tools wrap the useful node under these keys.
+    for key in ("node", "document", "result", "data"):
+        value = data.get(key)
+        if isinstance(value, dict) and ("type" in value or "children" in value):
+            return value
+
+    # Figma REST `/files/:key/nodes` shape: {"nodes": {"id": {"document": ...}}}
+    nodes = data.get("nodes")
+    if isinstance(nodes, dict):
+        documents = []
+        for value in nodes.values():
+            if isinstance(value, dict):
+                doc = value.get("document")
+                if isinstance(doc, dict):
+                    documents.append(doc)
+        if len(documents) == 1:
+            return documents[0]
+        if documents:
+            return {
+                "id": "figma-rest-nodes-root",
+                "name": "Figma REST nodes root",
+                "type": "FRAME",
+                "bounds": union_bounds(documents) or {"x": 0, "y": 0, "width": 0, "height": 0},
+                "children": documents,
+            }
+
+    return data
+
+
+def bounds(node: Node) -> Optional[Dict[str, float]]:
+    b = node.get("bounds") or node.get("absoluteBoundingBox")
     if not isinstance(b, dict):
         return None
     try:
@@ -108,19 +152,7 @@ def area(node: Node) -> float:
     return max(0.0, b["width"]) * max(0.0, b["height"])
 
 
-def center(b: Bounds) -> Tuple[float, float]:
-    return (b["x"] + b["width"] / 2, b["y"] + b["height"] / 2)
-
-
-def point_in_bounds(point: Tuple[float, float], outer: Bounds, tolerance: float = 0.0) -> bool:
-    x, y = point
-    return (
-        outer["x"] - tolerance <= x <= outer["x"] + outer["width"] + tolerance
-        and outer["y"] - tolerance <= y <= outer["y"] + outer["height"] + tolerance
-    )
-
-
-def intersects(a: Bounds, b: Bounds, tolerance: float = 0.0) -> bool:
+def intersects(a: Dict[str, float], b: Dict[str, float], tolerance: float = 1.0) -> bool:
     return not (
         a["x"] + a["width"] < b["x"] - tolerance
         or b["x"] + b["width"] < a["x"] - tolerance
@@ -129,7 +161,7 @@ def intersects(a: Bounds, b: Bounds, tolerance: float = 0.0) -> bool:
     )
 
 
-def contains(outer: Bounds, inner: Bounds, tolerance: float = 0.0) -> bool:
+def contains(outer: Dict[str, float], inner: Dict[str, float], tolerance: float = 2.0) -> bool:
     return (
         inner["x"] >= outer["x"] - tolerance
         and inner["y"] >= outer["y"] - tolerance
@@ -146,29 +178,24 @@ def walk(node: Node, ancestors: Optional[List[Node]] = None) -> Iterable[Tuple[N
             yield from walk(child, ancestors + [node])
 
 
-def find_by_id(root: Node, target_id: Optional[str]) -> Optional[Node]:
-    if not target_id:
-        return None
+def find_by_id(root: Node, node_id: str) -> Optional[Node]:
     for node, _ in walk(root):
-        if str(node.get("id")) == str(target_id):
+        if node.get("id") == node_id:
             return node
     return None
 
 
 def choose_target(root: Node) -> Node:
-    """Heuristic fallback when target-node-id is omitted.
-
-    Prefer a large frame/group whose name indicates a popup/modal/page.
-    """
-    candidates: List[Tuple[float, Node]] = []
-    for node, _ in walk(root):
+    candidates = []
+    for node, ancestors in walk(root):
         t = node.get("type")
         b = bounds(node)
         if t in CONTAINER_TYPES and b and b["width"] >= 120 and b["height"] >= 80:
-            name = str(node.get("name") or "").lower()
+            name = str(node.get("name") or "")
             score = area(node)
-            if any(word in name for word in ["popup", "modal", "dialog", "screen", "page", "frame"]):
+            if any(word in name.lower() for word in ["popup", "modal", "dialog", "screen", "page", "frame"]):
                 score *= 1.25
+            # Penalize document-size roots containing unrelated off-canvas screens.
             if len(node.get("children") or []) > 80:
                 score *= 0.8
             candidates.append((score, node))
@@ -191,12 +218,6 @@ def effective_visible(node: Node, ancestors: List[Node]) -> bool:
 
 
 def normalize_styles(styles: Any) -> Dict[str, Any]:
-    """Keep raw design style values from figma-mcp-go.
-
-    For VECTOR/RECTANGLE nodes these styles are not decorative by default.
-    They often represent actual backgrounds, borders, cards, controls, badges,
-    overlays, and table rows.
-    """
     if not isinstance(styles, dict):
         return {}
     out: Dict[str, Any] = {}
@@ -208,154 +229,21 @@ def normalize_styles(styles: Any) -> Dict[str, Any]:
         "fontStyle",
         "fontWeight",
         "lineHeight",
-        "letterSpacing",
         "textAlignHorizontal",
-        "textAlignVertical",
         "effects",
         "cornerRadius",
-        "topLeftRadius",
-        "topRightRadius",
-        "bottomRightRadius",
-        "bottomLeftRadius",
         "strokeWeight",
-        "strokeAlign",
-        "opacity",
-        "blendMode",
     ]:
         if key in styles:
             out[key] = styles[key]
     return out
 
 
-def _first_color(value: Any) -> Optional[str]:
-    if isinstance(value, str) and value.startswith("#"):
-        return value
-    if isinstance(value, list):
-        for item in value:
-            if isinstance(item, str) and item.startswith("#"):
-                return item
-            if isinstance(item, dict):
-                # Future-proof if serializer starts exporting richer paint objects.
-                color = item.get("color") or item.get("hex") or item.get("value")
-                if isinstance(color, str) and color.startswith("#"):
-                    return color
-    return None
-
-
-def _has_paint(value: Any) -> bool:
-    return _first_color(value) is not None
-
-
-def _px(value: Any) -> Optional[str]:
-    if value is None or value == "mixed":
-        return None
-    try:
-        n = float(value)
-    except (TypeError, ValueError):
-        return str(value)
-    if math.isclose(n, round(n)):
-        return f"{int(round(n))}px"
-    return f"{round(n, 2)}px"
-
-
-def css_from_node(node: Node, role: str) -> Dict[str, Any]:
-    """Convert raw styles to implementation-friendly CSS hints.
-
-    This does not replace visual diff. It simply prevents the coding agent from
-    ignoring VECTOR fills/strokes that are actually UI backgrounds.
-    """
-    st = normalize_styles(node.get("styles"))
-    node_type = node.get("type")
-    b = bounds(node)
-    css: Dict[str, Any] = {}
-
-    fill = _first_color(st.get("fills"))
-    stroke = _first_color(st.get("strokes"))
-
-    if node_type == "TEXT":
-        if fill:
-            css["color"] = fill
-        for src, dest in [
-            ("fontFamily", "fontFamily"),
-            ("fontSize", "fontSize"),
-            ("fontWeight", "fontWeight"),
-            ("lineHeight", "lineHeight"),
-            ("letterSpacing", "letterSpacing"),
-        ]:
-            if src in st:
-                css[dest] = _px(st[src]) if src in {"fontSize", "lineHeight", "letterSpacing"} else st[src]
-        if st.get("textAlignHorizontal"):
-            css["textAlign"] = str(st["textAlignHorizontal"]).lower()
-        return {k: v for k, v in css.items() if v is not None}
-
-    # Shape/vector styles. Large, rectangular VECTOR nodes are commonly
-    # backgrounds/controls in flattened Figma exports.
-    if fill:
-        css["backgroundColor"] = fill
-    if stroke:
-        css["borderColor"] = stroke
-        css["borderStyle"] = "solid"
-        stroke_width = st.get("strokeWeight")
-        css["borderWidth"] = _px(stroke_width) or "1px"
-
-    radius_keys = ["cornerRadius", "topLeftRadius", "topRightRadius", "bottomRightRadius", "bottomLeftRadius"]
-    if st.get("cornerRadius") is not None:
-        css["borderRadius"] = _px(st.get("cornerRadius"))
-    elif b and b["width"] == b["height"] and b["width"] <= 48 and role in {"icon", "avatar", "close-button"}:
-        css["borderRadius"] = "9999px"
-
-    if node.get("opacity") is not None:
-        css["opacity"] = node.get("opacity")
-    elif st.get("opacity") is not None:
-        css["opacity"] = st.get("opacity")
-
-    # Dividers commonly arrive as zero-height vectors with a stroke.
-    if role == "divider" and stroke:
-        css.pop("backgroundColor", None)
-        css["borderTopColor"] = stroke
-        css["borderTopStyle"] = "solid"
-        css["borderTopWidth"] = css.get("borderWidth", "1px")
-        css.pop("borderColor", None)
-        css.pop("borderStyle", None)
-        css.pop("borderWidth", None)
-
-    return {k: v for k, v in css.items() if v is not None}
-
-
-def render_hint(node: Node, role: str) -> str:
-    node_type = node.get("type")
-    b = bounds(node)
-    st = normalize_styles(node.get("styles"))
-    has_fill = _has_paint(st.get("fills"))
-    has_stroke = _has_paint(st.get("strokes"))
-
-    if node_type == "TEXT":
-        return "text"
-    if role == "divider":
-        return "css-divider"
-    if node_type in {"VECTOR", "RECTANGLE"}:
-        if role in {"icon", "close-button", "chevron-icon", "calendar-icon", "upload-icon", "image-placeholder"}:
-            return "svg-or-icon"
-        if role in {"control-box", "button-bg", "modal-surface", "surface", "overlay", "card", "badge", "avatar"}:
-            return "css-box"
-        if b and (b["width"] >= 48 or b["height"] >= 32) and (has_fill or has_stroke):
-            return "css-box"
-        return "svg-or-icon"
-    if node_type in {"ELLIPSE", "POLYGON", "STAR", "BOOLEAN_OPERATION", "LINE"}:
-        return "svg-or-icon"
-    if node_type in CONTAINER_TYPES:
-        return "container"
-    return "unknown"
-
-
-def classify_role(node: Node, target_bounds: Optional[Bounds]) -> str:
+def classify_role(node: Node, target_bounds: Optional[Dict[str, float]]) -> str:
     name = str(node.get("name") or "")
     node_type = node.get("type")
     text = str(node.get("characters") or "")
     b = bounds(node)
-    st = normalize_styles(node.get("styles"))
-    fill = _first_color(st.get("fills"))
-    stroke = _first_color(st.get("strokes"))
 
     for role, pattern in ROLE_PATTERNS:
         if pattern.search(name) or pattern.search(text):
@@ -364,48 +252,20 @@ def classify_role(node: Node, target_bounds: Optional[Bounds]) -> str:
     if node_type == "TEXT":
         if TEXT_SECTION_RE.match(text.strip()) and len(text.strip()) <= 40:
             return "section-title"
+        if text.strip().endswith("*") or (b and b["height"] <= 22 and len(text) <= 80):
+            return "text"
         return "text"
 
-    if not b:
-        return "container" if node_type in CONTAINER_TYPES else "shape"
-
-    if target_bounds and b["width"] >= target_bounds["width"] * 0.85 and b["height"] <= 2:
-        return "divider"
-    if target_bounds and b["height"] >= target_bounds["height"] * 0.85 and b["width"] <= 2:
-        return "divider"
-
-    if node_type in SHAPE_TYPES:
-        if target_bounds:
-            same_width = abs(b["width"] - target_bounds["width"]) <= 3
-            same_height = abs(b["height"] - target_bounds["height"]) <= 3
-            if same_width and same_height and fill:
-                return "overlay" if fill.lower() in {"#0f172a", "#000000"} else "surface"
-
-        if b["height"] >= 300 and b["width"] >= 300 and fill:
-            return "modal-surface" if fill.lower() in {"#ffffff", "#fff"} else "surface"
-
-        # Enterprise form fields/selects are frequently flattened as vector rectangles.
-        if 28 <= b["height"] <= 52 and b["width"] >= 180 and node_type in {"VECTOR", "RECTANGLE"}:
+    if b:
+        # Common input dimensions in enterprise forms.
+        if 28 <= b["height"] <= 52 and b["width"] >= 120 and node_type in {"VECTOR", "RECTANGLE"}:
             return "control-box"
-
-        # Buttons are also often vector rectangles. Use width to avoid confusing
-        # wide inputs with buttons.
-        if 28 <= b["height"] <= 52 and 40 <= b["width"] <= 180 and (fill or stroke):
+        if target_bounds and b["width"] >= target_bounds["width"] * 0.85 and b["height"] <= 2:
+            return "divider"
+        if 24 <= b["height"] <= 48 and 40 <= b["width"] <= 180:
             return "button-bg"
-
-        # Badges/chips.
-        if 16 <= b["height"] <= 28 and 32 <= b["width"] <= 160 and fill:
-            return "badge"
-
-        # Avatar/circle-ish backgrounds.
-        if abs(b["width"] - b["height"]) <= 2 and 24 <= b["width"] <= 48 and fill:
-            return "avatar"
-
-        if b["width"] <= 36 and b["height"] <= 36:
+        if b["width"] <= 32 and b["height"] <= 32:
             return "icon"
-
-        if (b["width"] >= 80 and b["height"] >= 24) and (fill or stroke):
-            return "surface"
 
     return "container" if node_type in CONTAINER_TYPES else "shape"
 
@@ -426,10 +286,6 @@ def collect_tokens(nodes: List[Node]) -> Dict[str, Any]:
                 for item in value:
                     if isinstance(item, str):
                         colors[item] += 1
-                    elif isinstance(item, dict):
-                        c = _first_color([item])
-                        if c:
-                            colors[c] += 1
             elif isinstance(value, str):
                 colors[value] += 1
         if st.get("fontFamily"):
@@ -444,11 +300,11 @@ def collect_tokens(nodes: List[Node]) -> Dict[str, Any]:
             strokes[str(st["strokeWeight"])] += 1
 
     return {
-        "colors": colors.most_common(30),
+        "colors": colors.most_common(20),
         "fonts": fonts.most_common(10),
         "fontSizes": font_sizes.most_common(12),
         "fontWeights": font_weights.most_common(10),
-        "radii": radii.most_common(12),
+        "radii": radii.most_common(10),
         "strokeWeights": strokes.most_common(10),
     }
 
@@ -459,24 +315,23 @@ def cluster_positions(values: List[float], tolerance: float = 6.0) -> List[float
     values = sorted(values)
     clusters: List[List[float]] = [[values[0]]]
     for value in values[1:]:
-        avg = sum(clusters[-1]) / len(clusters[-1])
-        if abs(value - avg) <= tolerance:
+        if abs(value - sum(clusters[-1]) / len(clusters[-1])) <= tolerance:
             clusters[-1].append(value)
         else:
             clusters.append([value])
     return [round(sum(c) / len(c), 2) for c in clusters]
 
 
-def infer_layout(semantic_nodes: List[Node], target_bounds: Bounds) -> Dict[str, Any]:
+def infer_layout(semantic_nodes: List[Node], target_bounds: Dict[str, float]) -> Dict[str, Any]:
     text_nodes = [n for n in semantic_nodes if n.get("type") == "TEXT" and bounds(n)]
-    box_nodes = [
-        n for n in semantic_nodes
-        if n.get("role") in {"control-box", "button-bg", "surface", "modal-surface", "badge"} and bounds(n)
-    ]
+    box_nodes = [n for n in semantic_nodes if n.get("role") in {"control-box", "button-bg"} and bounds(n)]
 
     xs = [bounds(n)["x"] for n in box_nodes if bounds(n)]
     widths = [bounds(n)["width"] for n in box_nodes if bounds(n)]
     ys = [bounds(n)["y"] for n in semantic_nodes if bounds(n)]
+
+    columns = cluster_positions(xs, tolerance=8)
+    rows = cluster_positions(ys, tolerance=4)
 
     sections = []
     for n in text_nodes:
@@ -486,19 +341,20 @@ def infer_layout(semantic_nodes: List[Node], target_bounds: Bounds) -> Dict[str,
 
     return {
         "target": target_bounds,
-        "columns": cluster_positions(xs, tolerance=8),
-        "commonBoxWidths": Counter(round(w) for w in widths).most_common(12),
-        "rowYClusters": cluster_positions(ys, tolerance=4)[:100],
+        "columns": columns,
+        "commonControlWidths": Counter(round(w) for w in widths).most_common(8),
+        "rowYClusters": rows[:80],
         "sections": sections,
     }
 
 
-def effective_target_bounds(target: Node) -> Optional[Bounds]:
+def effective_target_bounds(target: Node) -> Optional[Dict[str, float]]:
     """Return bounds used for clipping.
 
-    Some serializers return the selected FRAME bounds in absolute canvas
-    coordinates while children are normalized to local 0,0. When that happens,
-    use a same-size background child or children extent as the clipping box.
+    Some MCP/plugin serializers return the selected FRAME bounds in absolute
+    canvas coordinates while its children are normalized to a local 0,0 space.
+    When that happens, use a same-size background child or children extent as
+    the clipping box so visible children are not dropped as off-canvas.
     """
     tb = bounds(target)
     children = [c for c in (target.get("children") or []) if isinstance(c, dict) and bounds(c)]
@@ -510,6 +366,8 @@ def effective_target_bounds(target: Node) -> Optional[Bounds]:
     if outside <= len(child_bounds) * 0.5:
         return tb
 
+    # Prefer a direct child with the same size as the target. This is usually
+    # the local-space background/frame rectangle.
     for cb in child_bounds:
         if abs(cb["width"] - tb["width"]) <= 2 and abs(cb["height"] - tb["height"]) <= 2:
             return cb
@@ -519,77 +377,6 @@ def effective_target_bounds(target: Node) -> Optional[Bounds]:
     max_x = max(cb["x"] + cb["width"] for cb in child_bounds)
     max_y = max(cb["y"] + cb["height"] for cb in child_bounds)
     return {"x": min_x, "y": min_y, "width": max_x - min_x, "height": max_y - min_y}
-
-
-def build_composite_controls(nodes: List[Node]) -> List[Dict[str, Any]]:
-    """Pair CSS-box vectors with text/icon layers contained within them.
-
-    This gives the coding agent a semantic hint:
-    - a VECTOR with role=button-bg plus text inside is a button
-    - a VECTOR with role=control-box plus text/icon inside is an input/select
-    - a VECTOR with role=badge plus text inside is a badge/chip
-    """
-    boxes = [
-        n for n in nodes
-        if n.get("renderHint") == "css-box"
-        and n.get("role") in {"control-box", "button-bg", "badge", "avatar", "modal-surface", "surface"}
-        and bounds(n)
-    ]
-    texts = [n for n in nodes if n.get("type") == "TEXT" and bounds(n)]
-    icons = [n for n in nodes if n.get("renderHint") == "svg-or-icon" and bounds(n)]
-
-    composites: List[Dict[str, Any]] = []
-    used_child_ids = set()
-
-    for box in boxes:
-        bb = bounds(box)
-        if not bb:
-            continue
-        contained_texts = [
-            t for t in texts
-            if point_in_bounds(center(bounds(t)), bb, tolerance=2)
-            and t.get("id") not in used_child_ids
-        ]
-        contained_icons = [
-            i for i in icons
-            if point_in_bounds(center(bounds(i)), bb, tolerance=2)
-            and i.get("id") not in used_child_ids
-        ]
-
-        element = None
-        if box.get("role") == "button-bg" and contained_texts:
-            element = "button"
-        elif box.get("role") == "control-box":
-            # A chevron/calendar contained in the box usually means select/date-picker.
-            if any(i.get("role") in {"chevron-icon", "calendar-icon"} for i in contained_icons):
-                element = "select-or-date-control"
-            else:
-                element = "input"
-        elif box.get("role") == "badge" and contained_texts:
-            element = "badge"
-        elif box.get("role") in {"modal-surface", "surface"}:
-            # Avoid creating huge composites for whole screens/cards unless useful.
-            if len(contained_texts) <= 8 and len(contained_icons) <= 4:
-                element = "surface"
-
-        if not element:
-            continue
-
-        for child in contained_texts + contained_icons:
-            used_child_ids.add(child.get("id"))
-
-        composites.append({
-            "element": element,
-            "backgroundNodeId": box.get("id"),
-            "bounds": bb,
-            "role": box.get("role"),
-            "css": box.get("css", {}),
-            "text": " ".join(str(t.get("characters", "")).strip() for t in contained_texts).strip() or None,
-            "textNodeIds": [t.get("id") for t in contained_texts],
-            "iconNodeIds": [i.get("id") for i in contained_icons],
-        })
-
-    return composites
 
 
 def build_ir(root: Node, target_id: Optional[str]) -> Dict[str, Any]:
@@ -634,65 +421,44 @@ def build_ir(root: Node, target_id: Optional[str]) -> Dict[str, Any]:
         if not intersects(tb, b, tolerance=2):
             dropped["outside_target"] += 1
             continue
+        # Keep target itself and in-bounds children; avoid unrelated huge descendants.
         if node is not target and not contains(tb, b, tolerance=4):
             dropped["not_contained"] += 1
             continue
 
-        role = classify_role(node, tb)
         item: Node = {
             "id": node.get("id"),
             "name": node.get("name"),
             "type": t,
             "bounds": b,
-            "role": role,
-            "renderHint": render_hint(node, role),
+            "role": classify_role(node, tb),
         }
-
         if node.get("characters") is not None:
             item["characters"] = node.get("characters")
-
         styles = normalize_styles(node.get("styles"))
         if styles:
             item["styles"] = styles
-
-        css = css_from_node(node, role)
-        if css:
-            item["css"] = css
-
-        # Preserve MCP/plugin extras when available.
-        for key in [
-            "componentName",
-            "variantProperties",
-            "layout",
-            "constraints",
-            "opacity",
-            "visible",
-        ]:
-            if node.get(key) is not None:
-                item[key] = node.get(key)
-
+        if node.get("componentName"):
+            item["componentName"] = node.get("componentName")
+        if node.get("variantProperties"):
+            item["variantProperties"] = node.get("variantProperties")
+        if node.get("layout"):
+            item["layout"] = node.get("layout")
         kept.append(item)
 
     kept_sorted = sorted(kept, key=lambda n: (bounds(n)["y"], bounds(n)["x"]))
+
     role_counts = Counter(n.get("role") for n in kept_sorted)
     type_counts = Counter(n.get("type") for n in kept_sorted)
-    render_hint_counts = Counter(n.get("renderHint") for n in kept_sorted)
-
-    css_boxes = [n for n in kept_sorted if n.get("renderHint") == "css-box"]
-    composite_controls = build_composite_controls(kept_sorted)
 
     warnings = []
     if len(kept_sorted) > 250:
         warnings.append("IR still has many nodes; consider selecting a smaller target or fetching child nodes.")
     if role_counts.get("control-box", 0) and not role_counts.get("section-title", 0):
         warnings.append("Controls detected but no section titles; verify parser did not choose the wrong target.")
-    if css_boxes and not any(n.get("css", {}).get("backgroundColor") or n.get("css", {}).get("borderColor") for n in css_boxes):
-        warnings.append("CSS boxes detected but no fill/stroke CSS extracted; check MCP serializer styles.")
-    if any(n.get("type") in SHAPE_TYPES and n.get("role") in {"control-box", "button-bg", "surface", "modal-surface"} and not n.get("css") for n in kept_sorted):
-        warnings.append("Some shape/vector UI boxes have no css; serializer may be missing fills/strokes/cornerRadius.")
 
     return {
-        "version": "1.2",
+        "version": "1.1",
         "source": "figma-mcp-go-normalized",
         "target": {
             "id": target.get("id"),
@@ -705,27 +471,10 @@ def build_ir(root: Node, target_id: Optional[str]) -> Dict[str, Any]:
             "keptNodes": len(kept_sorted),
             "typeCounts": dict(type_counts),
             "roleCounts": dict(role_counts),
-            "renderHintCounts": dict(render_hint_counts),
-            "cssBoxCount": len(css_boxes),
-            "compositeControls": len(composite_controls),
             "dropped": dict(dropped),
         },
         "tokens": collect_tokens(kept_sorted),
         "layout": infer_layout(kept_sorted, tb),
-        "shapePrimitives": [
-            {
-                "id": n.get("id"),
-                "name": n.get("name"),
-                "type": n.get("type"),
-                "role": n.get("role"),
-                "renderHint": n.get("renderHint"),
-                "bounds": n.get("bounds"),
-                "css": n.get("css", {}),
-            }
-            for n in kept_sorted
-            if n.get("renderHint") in {"css-box", "css-divider", "svg-or-icon"}
-        ],
-        "compositeControls": composite_controls,
         "semanticNodes": kept_sorted,
         "warnings": warnings,
     }
@@ -739,6 +488,7 @@ def main() -> None:
     args = parser.parse_args()
 
     configure_stdio()
+
     payload = read_json(args.input)
     root = unwrap_mcp_payload(payload)
     ir = build_ir(root, args.target_node_id)

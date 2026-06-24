@@ -1,55 +1,18 @@
-# figma-to-code
+# vit-agent-skill: Figma implement fidelity
 
-Skill for converting one selected Figma node into production UI code with deterministic extraction.
+This package contains an agent skill for converting a single Figma selection into production frontend code with deterministic extraction and visual validation.
 
-This version fixes a common Figma/MCP issue: normal UI boxes may be exported as `VECTOR`.
-The extractor now preserves vector fills/strokes as implementation CSS and marks them with:
+Suggested location in a repo:
 
-- `renderHint: "css-box"`
-- `renderHint: "css-divider"`
-- `renderHint: "svg-or-icon"`
-
-## Install
-
-Copy this folder into your agent skill path, for example:
-
-```txt
-.agent-skills/
-  figma-to-code/
-    SKILL.md
-    scripts/
-      extract_figma_ir.py
+```text
+.agent-skills/figma-to-code/SKILL.md
+.agent-skills/figma-to-code/scripts/extract_figma_ir.py
 ```
 
-Or keep it in a repo structure:
+For Claude Code compatibility, you can also place it at:
 
-```txt
-vit-agent-skill/
-  skills/
-    figma-to-code/
-      SKILL.md
-      scripts/
-        extract_figma_ir.py
+```text
+.claude/skills/figma-to-code/SKILL.md
 ```
 
-## Run extractor
-
-```bat
-python -X utf8 .agent-skills\figma-to-code\scripts\extract_figma_ir.py --input .design-snapshots\feature\raw-output.json --out .design-snapshots\feature\figma-ir.json
-```
-
-With target node:
-
-```bat
-python -X utf8 .agent-skills\figma-to-code\scripts\extract_figma_ir.py --input .design-snapshots\feature\raw-output.json --out .design-snapshots\feature\figma-ir.json --target-node-id 5675:288345
-```
-
-## Important IR fields
-
-- `shapePrimitives`: vector/shape nodes with CSS.
-- `compositeControls`: inferred button/input/select/badge pairings.
-- `semanticNodes`: all kept nodes.
-- `tokens`: colors, fonts, sizes, radii, strokes.
-- `layout`: inferred columns/rows/sections.
-
-The coding agent should not ignore `VECTOR` nodes with `renderHint: "css-box"`.
+The key design choice is to run the extractor before the agent reads the raw MCP dump. This reduces token usage and prevents sibling frames, hidden layers, and off-canvas variants from contaminating implementation.
