@@ -1,24 +1,38 @@
 {
   "Button/Primary": {
-    "import": "@/components/ui/button",
     "component": "Button",
-    "props": { "variant": "primary" }
+    "import": "@/components/ui/Button",
+    "match": {
+      "role": "button-bg",
+      "css.backgroundColor": "#2563eb"
+    },
+    "props": {
+      "variant": "primary"
+    }
   },
   "Button/Secondary": {
-    "import": "@/components/ui/button",
     "component": "Button",
-    "props": { "variant": "secondary" }
+    "import": "@/components/ui/Button",
+    "match": {
+      "role": "button-bg",
+      "css.backgroundColor": "#ffffff"
+    },
+    "props": {
+      "variant": "secondary"
+    }
   },
   "Input/Text": {
-    "import": "@/components/ui/input",
-    "component": "Input"
+    "component": "Input",
+    "import": "@/components/ui/Input",
+    "match": {
+      "element": "input"
+    }
   },
   "Select/Default": {
-    "import": "@/components/ui/select",
-    "component": "Select"
-  },
-  "Dialog/Modal": {
-    "import": "@/components/ui/dialog",
-    "component": "Dialog"
+    "component": "Select",
+    "import": "@/components/ui/Select",
+    "match": {
+      "element": "select-or-date-control"
+    }
   }
 }
