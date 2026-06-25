@@ -38,6 +38,10 @@ Do not use this skill when:
 10. Validate rendered UI with screenshot comparison before declaring completion.
 11. On Windows, run Python commands with `python -X utf8`.
 12. Do not inspect raw Figma JSON with `json.load(open(path))`. Use `scripts/extract_figma_ir.py`, or use `Path(path).read_text(encoding="utf-8-sig")` for any quick JSON inspection.
+13. Take flat colors, text, fonts, sizes, radius, and coordinates from JSON (`styles.fills`/`styles.strokes`/`characters`/`fontFamily`...). Do NOT eyeball them from the screenshot when JSON has them.
+14. Use the screenshot to RECOVER what JSON cannot express: gradients (JSON gives one flat fill), empty `styles:{}` on a visible node, and `fills:"mixed"` (multiple colors in one node, e.g. label + red `*`). See `references/color-and-icon-extraction.md`.
+15. Icons: JSON gives stroke/fill HEX but no usable path `d`. Either export the icon node as SVG (`save_screenshots` `format:"SVG"`) for exact paths, or recreate a matching line-icon and color it from the JSON hex. Record which.
+16. Capture screenshots with `save_screenshots` to disk (PNG for visual checks + SVG for icon paths). Avoid `get_screenshot` for full frames — its inline base64 often exceeds the tool-result token limit.
 
 ## Required workflow
 
@@ -64,7 +68,7 @@ Preferred MCP sequence for `figma-mcp-go` style tools:
 5. `get_variable_defs`
 6. `get_fonts`
 7. `export_tokens`
-8. `get_screenshot` for the same selected node
+8. `save_screenshots` for the same node — write PNG (visual) + SVG (icon paths) to the snapshot dir. Prefer this over `get_screenshot`, whose inline base64 often exceeds the tool-result token limit for a full frame.
 
 Avoid `get_document` for implementation. If a response is truncated, fetch smaller child nodes by ID rather than broadening scope.
 
@@ -88,7 +92,7 @@ Create:
 Run:
 
 ```bash
-python -X utf8 .agent-skills/figma-implement-fidelity/scripts/extract_figma_ir.py \
+python -X utf8 .claude/skills/figma-to-code/scripts/extract_figma_ir.py \
   --input .design-snapshots/<feature-name>/raw-output.json \
   --out .design-snapshots/<feature-name>/figma-ir.json \
   --target-node-id <nodeId>
@@ -137,15 +141,15 @@ Implementation priorities:
 1. Semantic structure: modal/header/body/footer, form sections, form rows, fields, actions.
 2. Layout: columns, rows, gaps, padding, width/height from IR.
 3. Typography: font family, size, weight, line height.
-4. Colors, borders, radius, shadows, opacity.
-5. Assets/icons from snapshot or MCP asset endpoint.
+4. Colors, borders, radius, shadows, opacity — flat values from JSON; resolve gradients / empty `styles:{}` / `fills:"mixed"` from the screenshot per `references/color-and-icon-extraction.md`.
+5. Assets/icons: export the icon node as SVG for exact paths, or recreate a line-icon colored from the JSON hex (JSON has icon color but no usable path `d`).
 6. Responsive behavior from constraints/auto-layout patterns.
 
-Do not copy hidden-node styles into global CSS. Do not invent icon packages when Figma provides assets.
+Do not copy hidden-node styles into global CSS.
 
 ### 8. Validate visually
 
-Run the app and capture screenshot with Playwright or the repo's visual test tool. Compare with the Figma reference:
+Render the result and capture a screenshot (Playwright, the repo's visual test tool, or headless Chrome `--headless --screenshot`). When rendering a local file, pass a `file://` URL — a bare `index.html` is parsed as a hostname and fails to load. Compare with the Figma reference:
 
 - Layout: x/y/width/height/gap differences.
 - Typography: font family, size, weight, line-height.
@@ -164,11 +168,13 @@ Iterate until the major mismatches are fixed. If exact parity is impossible, doc
 - The agent creates absolute-positioned layouts for forms that should be flex/grid.
 - Figma MCP output is treated as final React/Tailwind instead of a design reference.
 - Screenshot is used without metadata, causing guessed spacing and typography.
+- A gradient or empty-`styles` node is shipped as the wrong flat color because the screenshot was never consulted.
+- Icon shapes are invented from imagination instead of exported SVG or a matched line-icon colored from the JSON hex.
 
 ## Example prompt
 
 ```text
-Implement the selected Figma node in this repo using the figma-implement-fidelity skill.
+Implement the selected Figma node in this repo using the figma-to-code skill.
 
 Requirements:
 - Use the exact selected frame/component only.
