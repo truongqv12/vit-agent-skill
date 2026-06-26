@@ -10,6 +10,7 @@ Apply when the user provides or references files.
 4. Preserve source identity in evidence log.
 5. Detect conflicts between files and user text.
 6. Do not expand technical detail beyond what the file states.
+7. If the file embeds screenshots/diagrams (`.docx`/`.pptx`/`.pdf`), extract them per `file-image-extraction-rules.md`, copy into the package `assets/`, pair each with its caption, and tag `[FILE]`. Never ignore embedded UI screenshots in a UI/flow spec.
 
 ## File evidence log
 

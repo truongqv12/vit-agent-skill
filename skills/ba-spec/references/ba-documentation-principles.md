@@ -87,3 +87,13 @@ Scenario: CCV phê duyệt trình ký
 Map each important source/goal to requirements, business rules, acceptance criteria, and QA focus.
 
 Do not leave high-priority requirements untraced.
+
+## 8. UI elements: catalog selects, never guess buttons
+
+When documenting UI from screenshots or descriptions:
+
+- **Select / dropdown:** record the visible option catalog (the list of values). If the full catalog is not visible, write down what is seen and raise a `UIQ-###` asking for the complete catalog. Do not fabricate options.
+- **Buttons / icons / controls with unclear purpose:** do not infer behavior. List them as `UIQ-###` UI open questions and ask.
+- Collect all `UIQ-###` items into a dedicated "UI Open Questions" section (separate from business `Q-###`), each with the screen, the element, what is seen, and what must be clarified.
+
+Guessing a select catalog or a button's action is a defect. When unsure, ask via `UIQ-###`.

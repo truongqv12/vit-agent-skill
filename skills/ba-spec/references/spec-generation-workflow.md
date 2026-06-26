@@ -26,7 +26,7 @@ Use `templates/feature-spec.md` as the canonical Markdown structure. Generate it
 20. Audit / analytics / logging.
 21. Dependencies.
 22. Assumptions.
-23. Open questions.
+23. Open questions (business `Q-###`, plus a `UIQ-###` sub-section for unknown select catalogs and unclear buttons when screenshots exist).
 24. Traceability matrix.
 25. Dev / QA handoff notes.
 26. Quality checklist.
@@ -62,6 +62,10 @@ If input is small but user asks to proceed, produce a minimum viable spec with:
 ## Practicality rule
 
 Prefer useful BA handoff over academic length. Include enough detail for dev/QA to implement and test, but do not pad the document.
+
+## Screenshots & step-by-step rule
+
+If the source embeds screenshots (see `file-image-extraction-rules.md`), build the spec step-by-step: each business step pairs its narrative (fields, selects, buttons) with its screenshots. Note each select's option catalog; raise `UIQ-###` for unknown catalogs and unclear buttons. If text and an image conflict (e.g. step count), raise an `[OPEN_QUESTION]` instead of choosing.
 
 
 ## Figma link requirement

@@ -33,6 +33,11 @@ When Figma links or related files exist, include an evidence section:
 | EVD-002 | Figma link | MCP success / MCP unavailable / Failed / Skipped by user | ... | ... |
 ```
 
+## UI evidence discipline
+
+- A select/dropdown without a fully visible option catalog → record what is seen and raise a `UIQ-###` for the full catalog. Never invent options.
+- A button/icon/control with unclear purpose → raise a `UIQ-###`. Never infer its action.
+
 ## Conflict handling
 
 If sources conflict:
@@ -40,3 +45,5 @@ If sources conflict:
 - Do not silently choose one.
 - Add `CONFLICT-###` row in the evidence log.
 - Add an `[OPEN_QUESTION]` asking which source is authoritative.
+
+This includes **text vs image** conflicts: if the narrative text and an extracted screenshot disagree (e.g. text says 7 steps but the history screen shows 6 steps plus an extra role), do not pick one — record the conflict and raise an `[OPEN_QUESTION]`.

@@ -4,7 +4,7 @@ description: Convert Vietnamese business requirements, Figma screenshots/links, 
 license: MIT
 metadata:
   author: ba-spec
-  version: "1.5.0"
+  version: "1.6.0"
 ---
 
 # ba-spec
@@ -66,11 +66,12 @@ Follow this exact workflow.
 6. **Extract evidence and confidence tags** using `references/source-confidence-and-evidence.md`.
 7. **Apply BA practice rules** using `references/ba-documentation-principles.md`.
 8. **If this is a feature upgrade**, apply `references/feature-upgrade-rules.md`.
-9. **If related files are provided**, apply `references/file-handling-rules.md`.
+9. **If related files are provided**, apply `references/file-handling-rules.md`. **If a file embeds screenshots/diagrams** (e.g. `.docx`/`.pptx`/`.pdf`), extract them using `references/file-image-extraction-rules.md`, copy into the package `assets/`, and tag `[FILE]`.
 10. **Generate the Vietnamese Markdown spec** inside the output package using `templates/feature-spec.md` and `references/spec-generation-workflow.md`.
-11. **Generate the Vietnamese HTML spec** inside the same output package using `templates/feature-spec.html` and `references/html-rendering-rules.md`. If the Markdown contains Mermaid diagrams, the HTML must render them using Mermaid.js CDN and also keep a readable source fallback.
+11. **Generate the Vietnamese HTML spec** inside the same output package using `templates/feature-spec.html` and `references/html-rendering-rules.md`. If extracted screenshots exist, use the step-by-step document variant (image beside each step + CSS lightbox). If the Markdown contains Mermaid diagrams, the HTML must render them using Mermaid.js CDN and also keep a readable source fallback.
 12. **Delete temporary helper files** using `references/workspace-hygiene-rules.md`.
 13. **Run quality gates** using `references/quality-gates.md` before final response.
+14. **(Optional) If the user asks for a PDF**, render it from the HTML using `references/export-pdf-rules.md`.
 
 ## Figma hard gate
 
@@ -158,6 +159,7 @@ Use these prefixes:
 - `CHG-###`: Change Impact
 - `ASM-###`: Assumption
 - `Q-###`: Open Question
+- `UIQ-###`: UI Open Question (unknown select catalog or unclear button/element — ask, never guess)
 
 ## Final response contract
 

@@ -51,6 +51,15 @@
   </style>
 </head>
 <body class="bg-slate-50 text-slate-900 antialiased">
+  <!--
+    VARIANT (when the source has per-step screenshots): render a step-by-step reading document.
+    For each business step add a block: left = narrative (actor -> action -> fields -> selects -> buttons),
+    right = that step's screenshots as <a href="#lb-imageNN"><img class="shot" src="assets/imageNN.png"></a> thumbnails.
+    Add a pure-CSS lightbox (.lb / .lb:target) per image and an "UI Open Questions (UIQ)" section for
+    unknown select catalogs and unclear buttons. Full pattern: references/html-rendering-rules.md.
+  -->
+  <!-- {{UI_OPEN_QUESTIONS}}: mirror the UIQ table from feature-spec.md when screenshots exist. -->
+
   <header class="border-b border-slate-200 bg-white">
     <div class="mx-auto max-w-7xl px-6 py-8">
       <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">

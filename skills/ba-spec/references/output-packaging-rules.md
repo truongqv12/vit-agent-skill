@@ -124,6 +124,19 @@ Use this by default:
 
 The two files must contain all review/handoff material needed by the team.
 
+### Allowed `assets/` folder (images only)
+
+When the input file embeds screenshots/diagrams (see `file-image-extraction-rules.md`), an `assets/` folder is allowed even by default, because the images are `[FILE]` evidence the spec must show:
+
+```text
+{{package-folder}}/
+  feature-spec.md
+  feature-spec.html
+  assets/            # extracted screenshots, referenced via relative paths
+```
+
+If the user also asks for a PDF, `feature-spec.pdf` may remain in the package too (see `export-pdf-rules.md`). Do not add any other companion files unless the user explicitly asks.
+
 ## What must be embedded in the two default files
 
 When Figma input exists, embed these sections in both files:

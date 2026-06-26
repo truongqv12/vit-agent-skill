@@ -382,6 +382,14 @@ Chỉ ghi NFR có căn cứ từ input hoặc cần thiết ở mức nghiệp v
 |---|---|---|---:|---|
 | Q-001 | {{question}} | {{Business goal/User role/Flow/Data/Permission/etc.}} | {{Có/Không}} | {{role/team}} |
 
+### 24.1 UI Open Questions
+
+> Chỉ dùng khi có ảnh giao diện. Select chưa rõ danh mục và nút chưa rõ chức năng phải hỏi lại, không suy đoán.
+
+| ID | Màn / Phần tử | Đang thấy | Cần làm rõ |
+|---|---|---|---|
+| UIQ-001 | {{screen / select hoặc button}} | {{giá trị/placeholder đang thấy}} | {{danh mục đầy đủ? / chức năng nút?}} |
+
 ---
 
 ## 25. Traceability matrix

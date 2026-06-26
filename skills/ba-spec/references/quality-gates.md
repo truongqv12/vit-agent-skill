@@ -27,6 +27,9 @@ Run these checks before final response.
 | State | States/transitions or open questions. |
 | Acceptance criteria | Testable AC mapped to requirements. |
 | Traceability | Important goals/sources map to FR/BR/AC/test focus. |
+| Image evidence | If the source embeds screenshots, they are extracted to `assets/`, tagged `[FILE]`, and shown beside the relevant step (not ignored). |
+| UI open questions | Every select with unknown catalog and every unclear button is captured as `UIQ-###` — none silently guessed. |
+| Text vs image conflict | Any disagreement between narrative text and screenshots (e.g. step count) is raised as `[OPEN_QUESTION]`, not resolved arbitrarily. |
 
 ## Final response checklist
 
