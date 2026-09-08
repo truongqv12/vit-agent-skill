@@ -1,0 +1,15 @@
+{
+  "_comment": "Per-project defaults for jira_create_issue. Add one entry per project you create issues in. Values feed jira_create_issue params (project_key, issue_type, components) and additional_fields.",
+  "defaultProfile": "CCDT",
+  "profiles": {
+    "CCDT": {
+      "project_key": "CCDT",
+      "default_issue_type": "Bug",
+      "components": [],
+      "default_additional_fields": {
+        "labels": ["web"]
+      },
+      "notes": "Công chứng số. Adjust default_issue_type to Task/Sub-task per need. Confirm components/labels against the live project before relying on them."
+    }
+  }
+}

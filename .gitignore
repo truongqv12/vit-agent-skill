@@ -107,7 +107,8 @@ claude/skills/ai-multimodal/assets/demo-*.claude/session-state/*.tmp
 # =========================
 # Misc / Assets / External
 # =========================
-assets/
+/assets/
+!skills/**/assets/
 external/
 worktrees/
 skills-lock.json

@@ -6,6 +6,31 @@
       "title": "Business Analysis",
       "description": "Skills for turning business input, Figma context, and change requests into practical Vietnamese feature specifications for dev and QA.",
       "skills": ["ba-spec"]
+    },
+    {
+      "title": "Agent Workflows",
+      "description": "Portable skills for framing outcomes, prompt optimization, decisions, and delivery workflows.",
+      "skills": ["brainstorm", "vit-plan", "prompt-leverage"]
+    },
+    {
+      "title": "Delivery Loop",
+      "description": "Portable skills for the implementation delivery loop: orchestrated implementation, codebase discovery, research, verification, review, and bug fixing.",
+      "skills": ["cook", "fix", "scout", "research", "code-review", "test", "debug"]
+    },
+    {
+      "title": "Project Operations",
+      "description": "Portable skills for finalizing delivery: version control, plan progress sync, documentation, and technical journaling.",
+      "skills": ["git", "project-management", "docs", "journal"]
+    },
+    {
+      "title": "Frontend Implementation",
+      "description": "Skills for translating design evidence into production frontend code.",
+      "skills": ["figma-to-code"]
+    },
+    {
+      "title": "Productivity",
+      "description": "Skills for driving external delivery tools such as issue trackers.",
+      "skills": ["jira-task"]
     }
   ]
 }
