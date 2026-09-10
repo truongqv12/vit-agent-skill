@@ -19,8 +19,8 @@ def resolve_user_key(client, username):
         today = datetime.now()
         past = (today - timedelta(days=30)).strftime("%Y-%m-%d")
         now_str = today.strftime("%Y-%m-%d")
-        w_res = client.session.get(
-            f"{client.base_url}/rest/tempo-timesheets/3/worklogs?username={username}&dateFrom={past}&dateTo={now_str}"
+        w_res = client.get(
+            f"/rest/tempo-timesheets/3/worklogs?username={username}&dateFrom={past}&dateTo={now_str}"
         )
         if w_res.ok:
             items = w_res.json()
@@ -67,8 +67,8 @@ def main():
     # Check total logged hours for this week first
     logged_sec = 0
     try:
-        w_res = client.session.get(
-            f"{client.base_url}/rest/tempo-timesheets/3/worklogs?username={username}&dateFrom={date_from}&dateTo={date_to}"
+        w_res = client.get(
+            f"/rest/tempo-timesheets/3/worklogs?username={username}&dateFrom={date_from}&dateTo={date_to}"
         )
         if w_res.ok:
             for item in w_res.json():
@@ -98,13 +98,6 @@ def main():
             print("Đã hủy.")
             return
 
-    headers = {
-        'Origin': client.base_url,
-        'Referer': f"{client.base_url}/secure/Tempo.jspa",
-        'X-Atlassian-Token': 'no-check',
-        'X-Requested-With': 'XMLHttpRequest'
-    }
-
     payload = {
         "user": {"key": user_key},
         "period": {
@@ -120,10 +113,9 @@ def main():
     }
 
     try:
-        res = client.session.post(
-            f"{client.base_url}/rest/tempo-timesheets/4/timesheet-approval",
-            json=payload,
-            headers=headers
+        res = client.post(
+            "/rest/tempo-timesheets/4/timesheet-approval",
+            json=payload
         )
         if res.status_code in (200, 201, 204):
             data = res.json() if res.text else {}

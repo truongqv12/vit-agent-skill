@@ -17,37 +17,35 @@ if sys.stdout and hasattr(sys.stdout, "buffer"):
 urllib3.disable_warnings()
 
 
-def find_env_file():
-    """Find .env file in multiple likely locations: cwd, script dir, parent dir, or user home."""
-    candidates = [
-        os.path.join(os.getcwd(), ".env"),
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"),
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env"),
-        os.path.expanduser("~/.gemini/config/skills/jira-task/.env"),
-        "D:\\tools\\.env",
-    ]
-    for p in candidates:
-        norm = os.path.normpath(p)
-        if os.path.isfile(norm):
-            return norm
-    return None
-
-
 def load_config(env_path=None):
-    """Load configuration from .env or environment variables."""
+    """Load configuration with layered fallback: skill base .env -> workspace .env -> environment variables."""
     config = {}
-    target_path = env_path or find_env_file()
-    if target_path and os.path.exists(target_path):
-        with open(target_path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith("#"):
-                    continue
-                if "=" in line:
-                    k, v = line.split("=", 1)
-                    config[k.strip()] = v.strip().strip('"').strip("'")
+    skill_dir_env = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env"))
+    user_skill_env = os.path.normpath(os.path.expanduser("~/.gemini/config/skills/jira-task/.env"))
+    cwd_env = os.path.normpath(os.path.join(os.getcwd(), ".env"))
 
-    # Priority: System env > .env file > default
+    env_paths = [user_skill_env, skill_dir_env]
+    if cwd_env not in env_paths and os.path.isfile(cwd_env):
+        env_paths.append(cwd_env)
+    if env_path and os.path.isfile(env_path):
+        env_paths.append(os.path.normpath(env_path))
+
+    last_loaded_path = None
+    for p in env_paths:
+        if os.path.isfile(p):
+            last_loaded_path = p
+            with open(p, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("#"):
+                        continue
+                    if "=" in line:
+                        k, v = line.split("=", 1)
+                        val = v.strip().strip('"').strip("'")
+                        if val:
+                            config[k.strip()] = val
+
+    # Priority: System env > loaded config > default
     base_url = os.environ.get("JIRA_BASE_URL") or config.get("JIRA_BASE_URL") or "https://cntt.vnpt.vn"
     username = os.environ.get("JIRA_USERNAME") or config.get("JIRA_USERNAME") or ""
     password = os.environ.get("JIRA_PASSWORD") or config.get("JIRA_PASSWORD") or ""
@@ -62,7 +60,7 @@ def load_config(env_path=None):
         "pat": pat,
         "cookie": cookie,
         "ignore_ssl": ignore_ssl,
-        "env_file": target_path
+        "env_file": last_loaded_path
     }
 
 
@@ -238,7 +236,7 @@ class JiraClient:
         if fields:
             params["fields"] = fields if isinstance(fields, str) else ",".join(fields)
 
-        res = self.get("/rest/api/2/search", params=params)
+        res = self.get("/rest/api/latest/search", params=params)
         if res.ok:
             return res.json()
         raise RuntimeError(f"Search failed ({res.status_code}): {res.text}")
@@ -247,13 +245,13 @@ class JiraClient:
         params = {}
         if fields:
             params["fields"] = fields if isinstance(fields, str) else ",".join(fields)
-        res = self.get(f"/rest/api/2/issue/{key}", params=params)
+        res = self.get(f"/rest/api/latest/issue/{key}", params=params)
         if res.ok:
             return res.json()
         raise RuntimeError(f"Get issue {key} failed ({res.status_code}): {res.text}")
 
     def get_transitions(self, key):
-        res = self.get(f"/rest/api/2/issue/{key}/transitions")
+        res = self.get(f"/rest/api/latest/issue/{key}/transitions")
         if res.ok:
             return res.json().get("transitions", [])
         raise RuntimeError(f"Get transitions for {key} failed ({res.status_code}): {res.text}")
@@ -268,7 +266,7 @@ class JiraClient:
             payload["update"] = {
                 "comment": [{"add": {"body": comment}}]
             }
-        res = self.post(f"/rest/api/2/issue/{key}/transitions", json=payload)
+        res = self.post(f"/rest/api/latest/issue/{key}/transitions", json=payload)
         if res.status_code in (200, 204):
             return True
         raise RuntimeError(f"Transition {key} to {transition_id} failed ({res.status_code}): {res.text}")
@@ -321,13 +319,13 @@ class JiraClient:
         }
         if started:
             payload["started"] = started
-        res = self.post(f"/rest/api/2/issue/{key}/worklog", json=payload)
+        res = self.post(f"/rest/api/latest/issue/{key}/worklog", json=payload)
         if res.status_code in (200, 201):
             return res.json()
         raise RuntimeError(f"Add worklog to {key} failed ({res.status_code}): {res.text}")
 
     def get_worklogs(self, key):
-        res = self.get(f"/rest/api/2/issue/{key}/worklog")
+        res = self.get(f"/rest/api/latest/issue/{key}/worklog")
         if res.ok:
             return res.json().get("worklogs", [])
         raise RuntimeError(f"Get worklogs for {key} failed ({res.status_code}): {res.text}")
@@ -351,13 +349,13 @@ class JiraClient:
         if additional_fields:
             fields.update(additional_fields)
 
-        res = self.post("/rest/api/2/issue", json={"fields": fields})
+        res = self.post("/rest/api/latest/issue", json={"fields": fields})
         if res.status_code in (200, 201):
             return res.json()
         raise RuntimeError(f"Create issue failed ({res.status_code}): {res.text}")
 
     def update_issue(self, key, fields):
-        res = self.put(f"/rest/api/2/issue/{key}", json={"fields": fields})
+        res = self.put(f"/rest/api/latest/issue/{key}", json={"fields": fields})
         if res.status_code in (200, 204):
             return True
         raise RuntimeError(f"Update issue {key} failed ({res.status_code}): {res.text}")

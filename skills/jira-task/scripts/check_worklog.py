@@ -44,15 +44,8 @@ def main():
     print("\n[1] TRẠNG THÁI NỘP DUYỆT TIMESHEET (TEMPO):")
     try:
         user_key = client.config.get("user_key") or "JIRAUSER15790"
-        headers = {
-            'Origin': client.base_url,
-            'Referer': f"{client.base_url}/secure/Tempo.jspa",
-            'X-Atlassian-Token': 'no-check',
-            'X-Requested-With': 'XMLHttpRequest'
-        }
-        t_res = client.session.get(
-            f"{client.base_url}/rest/tempo-timesheets/4/timesheet-approval/approval-statuses?numberOfPeriods=8&userKey={user_key}",
-            headers=headers
+        t_res = client.get(
+            f"/rest/tempo-timesheets/4/timesheet-approval/approval-statuses?numberOfPeriods=8&userKey={user_key}"
         )
         if t_res.ok:
             statuses = t_res.json()
