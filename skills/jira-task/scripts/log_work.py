@@ -40,23 +40,17 @@ def run_weekly_log(client, key, comment, hours_per_day, weeks_ago, target_date, 
         print(f" • Ngày loại trừ : {', '.join(exclude_dates)}")
     print("-" * 80)
 
-    # Check existing worklogs
+    # Check existing worklogs via fast Tempo endpoint
     username = client.username
-    jql = f'worklogAuthor = "{username}" AND worklogDate >= "{start_str}" AND worklogDate <= "{end_str}"'
     logged_days = {}
     try:
-        data = client.search_issues(jql, fields="worklog", max_results=100)
-        for issue in data.get("issues", []):
-            ikey = issue.get("key")
-            try:
-                wls = client.get_worklogs(ikey)
-            except Exception:
-                wls = []
-            for w in wls:
-                if w.get("author", {}).get("name") == username:
-                    d_str = w.get("started", "")[:10]
-                    sec = w.get("timeSpentSeconds", 0)
-                    logged_days[d_str] = logged_days.get(d_str, 0) + sec
+        tempo_url = f"/rest/tempo-timesheets/3/worklogs?username={username}&dateFrom={start_str}&dateTo={end_str}"
+        res = client.get(tempo_url)
+        if res.ok:
+            for item in res.json():
+                d_str = item.get("dateStarted", "")[:10]
+                sec = item.get("timeSpentSeconds", 0)
+                logged_days[d_str] = logged_days.get(d_str, 0) + sec
     except Exception as e:
         print(f"[!] Warning checking existing logs: {e}")
 

@@ -43,17 +43,47 @@ def main():
     # 1. Check Tempo timesheet approval status
     print("\n[1] TRẠNG THÁI NỘP DUYỆT TIMESHEET (TEMPO):")
     try:
-        u_res = client.get(f"/rest/api/2/user?username={username}")
-        user_key = u_res.json().get("key", username) if u_res.ok else username
-        t_res = client.get(f"/rest/tempo-timesheets/4/timesheet-approval/current?userKey={user_key}")
+        user_key = client.config.get("user_key") or "JIRAUSER15790"
+        headers = {
+            'Origin': client.base_url,
+            'Referer': f"{client.base_url}/secure/Tempo.jspa",
+            'X-Atlassian-Token': 'no-check',
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+        t_res = client.session.get(
+            f"{client.base_url}/rest/tempo-timesheets/4/timesheet-approval/approval-statuses?numberOfPeriods=8&userKey={user_key}",
+            headers=headers
+        )
         if t_res.ok:
-            t_data = t_res.json()
-            status = t_data.get("status", {}).get("key", "OPEN")
-            reviewer = t_data.get("reviewer", {}).get("displayName", "N/A")
-            print(f" • Trạng thái : {status.upper()}")
-            print(f" • Người duyệt: {reviewer}")
+            statuses = t_res.json()
+            matched = None
+            for s in statuses:
+                p = s.get("period", {})
+                if p.get("dateFrom") == start_str:
+                    matched = s
+                    break
+            if matched:
+                status_raw = matched.get("status", "OPEN").upper()
+                status_desc = {
+                    "OPEN": "CHƯA NỘP (OPEN)",
+                    "WAITING_FOR_APPROVAL": "ĐÃ NỘP - CHỜ DUYỆT (WAITING_FOR_APPROVAL)",
+                    "APPROVED": "ĐÃ ĐƯỢC DUYỆT (APPROVED)",
+                    "CLOSED": "ĐÃ ĐÓNG (CLOSED)"
+                }.get(status_raw, status_raw)
+                
+                action_info = matched.get("action") or {}
+                reviewer_info = action_info.get("reviewer") or matched.get("reviewer") or {}
+                reviewer_name = reviewer_info.get("displayName", reviewer_info.get("name", "N/A"))
+                comment = action_info.get("comment", "")
+
+                print(f" • Trạng thái : {status_desc}")
+                print(f" • Người duyệt: {reviewer_name}")
+                if comment:
+                    print(f" • Ghi chú    : {comment}")
+            else:
+                print(f" • Không tìm thấy bản ghi phê duyệt cho tuần {start_str}.")
         else:
-            print(" • Không lấy được thông tin Tempo (hoặc chưa cài Tempo Timesheet).")
+            print(f" • Không lấy được thông tin phê duyệt Tempo (HTTP {t_res.status_code}).")
     except Exception as e:
         print(f" • Lỗi kiểm tra Tempo: {e}")
 
@@ -65,29 +95,39 @@ def main():
     total_week_seconds = 0
 
     try:
-        data = client.search_issues(jql, fields="summary,worklog", max_results=100)
-        issues = data.get("issues", [])
-        for issue in issues:
-            key = issue.get("key")
-            summary = issue.get("fields", {}).get("summary", "")
-            try:
-                wls = client.get_worklogs(key)
-            except Exception:
-                wls = []
-            for w in wls:
-                if w.get("author", {}).get("name") == username:
-                    d_str = w.get("started", "")[:10]
-                    if start_str <= d_str <= end_str:
-                        sec = w.get("timeSpentSeconds", 0)
-                        comment = w.get("comment", "")
-                        day_totals[d_str] = day_totals.get(d_str, 0) + sec
-                        day_details.setdefault(d_str, []).append({
-                            "key": key,
-                            "summary": summary,
-                            "hours": round(sec / 3600, 1),
-                            "comment": comment
-                        })
-                        total_week_seconds += sec
+        # Fast path: fetch all worklogs for the user in date range in 1 single HTTP request
+        tempo_url = f"/rest/tempo-timesheets/3/worklogs?username={username}&dateFrom={start_str}&dateTo={end_str}"
+        res = client.get(tempo_url)
+        if res.ok:
+            for w in res.json():
+                d_str = w.get("dateStarted", "")[:10]
+                if start_str <= d_str <= end_str:
+                    sec = w.get("timeSpentSeconds", 0)
+                    comment = w.get("comment", "")
+                    issue_key = w.get("issue", {}).get("key", "Unknown")
+                    day_totals[d_str] = day_totals.get(d_str, 0) + sec
+                    day_details.setdefault(d_str, []).append({
+                        "key": issue_key,
+                        "hours": round(sec / 3600, 1),
+                        "comment": comment
+                    })
+                    total_week_seconds += sec
+        else:
+            # Fallback to JQL search if Tempo is unavailable
+            data = client.search_issues(jql, fields="summary,worklog", max_results=100)
+            for issue in data.get("issues", []):
+                key = issue.get("key")
+                try:
+                    wls = client.get_worklogs(key)
+                except Exception:
+                    wls = []
+                for w in wls:
+                    if w.get("author", {}).get("name") == username:
+                        d_str = w.get("started", "")[:10]
+                        if start_str <= d_str <= end_str:
+                            sec = w.get("timeSpentSeconds", 0)
+                            day_totals[d_str] = day_totals.get(d_str, 0) + sec
+                            total_week_seconds += sec
 
         # Render Monday -> Friday
         day_names = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6"]

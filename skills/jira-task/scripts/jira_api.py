@@ -69,7 +69,7 @@ def load_config(env_path=None):
 class JiraClient:
     """Robust Jira REST client with automatic rate-limit backoff and auth fallback."""
 
-    def __init__(self, config=None, min_interval=1.0, max_retries=3):
+    def __init__(self, config=None, min_interval=1.0, max_retries=4):
         self.config = config or load_config()
         self.base_url = self.config["base_url"]
         self.username = self.config["username"]
@@ -83,27 +83,87 @@ class JiraClient:
         self.session = requests.Session()
         self.session.verify = self.verify_ssl
 
-        # Setup auth headers
-        if self.pat and self.pat not in (self.password, "your_token"):
+        # Standard browser headers to avoid automated bot fingerprinting by WAF and bypass XSRF
+        self.session.headers.update({
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Origin": self.base_url,
+            "Referer": f"{self.base_url}/secure/Tempo.jspa",
+            "X-Atlassian-Token": "no-check",
+            "X-Requested-With": "XMLHttpRequest"
+        })
+
+        # Setup auth headers & cookies
+        if self.config.get("cookie"):
+            from urllib.parse import urlparse
+            host = urlparse(self.base_url).hostname
+            raw_cookie = self.config["cookie"].strip()
+
+            # Handle full cookie header (e.g. JSESSIONID=...; other=...) vs single value
+            if "=" in raw_cookie:
+                for part in raw_cookie.split(";"):
+                    part = part.strip()
+                    if "=" in part:
+                        ck, cv = part.split("=", 1)
+                        self.session.cookies.set(ck.strip(), cv.strip(), domain=host, path="/")
+            else:
+                self.session.cookies.set("JSESSIONID", raw_cookie, domain=host, path="/")
+
+        elif self.pat and self.pat not in (self.password, "your_token"):
             self.session.headers.update({
-                "Authorization": f"Bearer {self.pat}",
-                "Content-Type": "application/json",
-                "Accept": "application/json"
-            })
-        elif self.config["cookie"]:
-            self.session.cookies.set("JSESSIONID", self.config["cookie"])
-            self.session.headers.update({
-                "Content-Type": "application/json",
-                "Accept": "application/json"
+                "Authorization": f"Bearer {self.pat}"
             })
         elif self.username and self.password:
-            auth_str = f"{self.username}:{self.password}"
-            auth_b64 = base64.b64encode(auth_str.encode("utf-8")).decode("utf-8")
-            self.session.headers.update({
-                "Authorization": f"Basic {auth_b64}",
-                "Content-Type": "application/json",
-                "Accept": "application/json"
-            })
+            if not self._load_cached_session():
+                self._login_web()
+
+    def _get_cache_file(self):
+        import tempfile
+        return os.path.join(tempfile.gettempdir(), f".jira_session_{self.username}.json")
+
+    def _load_cached_session(self):
+        cache_file = self._get_cache_file()
+        if os.path.isfile(cache_file):
+            try:
+                # Valid for 2 hours
+                if time.time() - os.path.getmtime(cache_file) < 7200:
+                    with open(cache_file, "r") as f:
+                        cookies = json.load(f)
+                    # Must be logged in token
+                    xsrf = cookies.get("atlassian.xsrf.token", "")
+                    if xsrf.endswith("_lin"):
+                        from urllib.parse import urlparse
+                        host = urlparse(self.base_url).hostname
+                        for k, v in cookies.items():
+                            self.session.cookies.set(k, v, domain=host, path="/")
+                        return True
+            except Exception:
+                pass
+        return False
+
+    def _login_web(self):
+        if not (self.username and self.password):
+            return False
+        try:
+            res = self.session.post(
+                f"{self.base_url}/login.jsp",
+                data={"os_username": self.username, "os_password": self.password},
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                timeout=15
+            )
+            cookies = self.session.cookies.get_dict()
+            xsrf = cookies.get("atlassian.xsrf.token", "")
+            if xsrf.endswith("_lin") or res.ok:
+                try:
+                    with open(self._get_cache_file(), "w") as f:
+                        json.dump(cookies, f)
+                except Exception:
+                    pass
+                return True
+            return False
+        except Exception:
+            return False
 
     def _throttle(self):
         """Ensure minimum interval between requests to prevent triggering rate-limiting."""
@@ -123,14 +183,28 @@ class JiraClient:
             try:
                 res = self.session.request(method, url, **kwargs)
 
-                # Check if hit rate-limit or temporary 401
-                if res.status_code == 401:
+                # If unauthorized, try refreshing session via login.jsp once
+                if res.status_code == 401 and self.username and self.password and attempt == 1:
+                    if self._login_web():
+                        continue
+
+                # Check if hit rate-limit or temporary burst restriction (429, 503, or real rate-limiting)
+                if res.status_code in (401, 429, 503):
                     err_text = res.text
-                    # Detect rate-limit cooldown
-                    if "OTP_REQUIRED" in err_text or "rate limit" in err_text.lower():
+                    triggers = [
+                        "rate limit",
+                        "ratelimit",
+                        "Too Many Requests"
+                    ]
+                    if res.status_code in (429, 503) or any(t in err_text or t in err_text.lower() for t in triggers):
                         if attempt < self.max_retries:
-                            wait_sec = 15
-                            print(f"[!] Jira VNPT rate-limit detected (401/OTP). Waiting {wait_sec}s before retry ({attempt}/{self.max_retries})...", file=sys.stderr)
+                            wait_sec = 15 * attempt
+                            self.min_interval = max(self.min_interval, 4.0)
+                            print(
+                                f"[!] Jira VNPT rate-limit detected (HTTP {res.status_code}). "
+                                f"Waiting {wait_sec}s cooldown before retry ({attempt}/{self.max_retries})...",
+                                file=sys.stderr
+                            )
                             time.sleep(wait_sec)
                             continue
 
@@ -200,6 +274,47 @@ class JiraClient:
         raise RuntimeError(f"Transition {key} to {transition_id} failed ({res.status_code}): {res.text}")
 
     def add_worklog(self, key, time_spent, comment="", started=None):
+        # Convert time_spent string to seconds (e.g. '4h', '8h', '1d', '30m')
+        def parse_seconds(ts):
+            sec = 0
+            for part in str(ts).lower().replace(" ", "").split():
+                val = ""
+                for ch in part:
+                    if ch.isdigit() or ch == '.':
+                        val += ch
+                    elif ch == 'h':
+                        sec += int(float(val or 1) * 3600)
+                        val = ""
+                    elif ch == 'd':
+                        sec += int(float(val or 1) * 8 * 3600)
+                        val = ""
+                    elif ch == 'm':
+                        sec += int(float(val or 1) * 60)
+                        val = ""
+            if sec == 0:
+                try:
+                    sec = int(float(ts) * 3600)
+                except Exception:
+                    sec = 14400
+            return sec
+
+        # Try Tempo Timesheets endpoint first (works with Jira VNPT session cookie directly)
+        date_started = started[:19] + ".000" if started else datetime.now().strftime("%Y-%m-%dT%H:%M:%S.000")
+        tempo_payload = {
+            "issue": {"key": key.upper(), "remainingEstimateSeconds": 0},
+            "timeSpentSeconds": parse_seconds(time_spent),
+            "dateStarted": date_started,
+            "comment": comment,
+            "author": {"name": self.username}
+        }
+        try:
+            tempo_res = self.post("/rest/tempo-timesheets/3/worklogs", json=tempo_payload)
+            if tempo_res.status_code in (200, 201):
+                return tempo_res.json()
+        except Exception:
+            pass
+
+        # Fallback to standard Jira issue worklog endpoint
         payload = {
             "timeSpent": time_spent,
             "comment": comment

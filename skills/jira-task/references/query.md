@@ -1,10 +1,13 @@
 # Query, List, and View Issues
 
-Use `list_tasks.py` and `view_task.py` directly. No MCP needed.
+> **CRITICAL: NEVER USE MCP (`mcp-atlassian`).** Always execute scripts directly via terminal.
+
+## Script Location
+- List/Filter: `scripts/list_tasks.py`
+- View/Attachments: `scripts/view_task.py`
+- Export Excel: `scripts/export_excel.py`
 
 ## 1. List and Filter Tasks (`list_tasks.py`)
-
-Run `python scripts/list_tasks.py` with flexible flags:
 
 ```bash
 # My open/unresolved tasks (default)
@@ -28,26 +31,17 @@ python scripts/list_tasks.py --mine --json
 
 ## 2. View Full Detail & Download Attachments (`view_task.py`)
 
-```bash
-# View 1 issue with description and all comments
-python scripts/view_task.py CCDT-99
+Supports checking one or multiple tasks at once:
 
-# View multiple issues and automatically download all image/file attachments:
-python scripts/view_task.py CCDT-99 CCDT-97 CCDT-96 -d
+```bash
+# Check status, description, and comments of batch tasks:
+python scripts/view_task.py CCDT-33 CCDT-43 CCDT-103
+
+# View and download attachments locally:
+python scripts/view_task.py CCDT-99 -d
 
 # Output raw JSON
 python scripts/view_task.py CCDT-99 --json
 ```
 
 - When `-d` is passed, files are saved locally to `attachments/<KEY>/<id>_<filename>`.
-- Use vision analysis on downloaded images to inspect UI/UX requirements.
-
-## 3. Export Project to Styled Excel (`export_excel.py`)
-
-```bash
-# Export all tasks of CCDT with status colors, hyperlinks, and auto-width:
-python scripts/export_excel.py CCDT
-
-# Only unresolved tasks:
-python scripts/export_excel.py CCDT --unresolved
-```

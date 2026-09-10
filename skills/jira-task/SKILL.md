@@ -7,43 +7,113 @@ category: productivity
 keywords: [jira, script, python, worklog, logwork, transition, resolve, requirements, task, subtask, vnpt, ccdt]
 metadata:
   author: opencode
-  version: "3.0.0"
+  version: "3.1.0"
   portability: standalone
 ---
 
 # Jira Task Toolkit (Standalone Python Suite)
 
-Drive Jira **directly through the bundled Python scripts in `scripts/`** (or the project workspace).
-This eliminates heavy MCP round-trips, saves LLM context/requests, and prevents server-side rate limits with built-in backoff.
+> [!CRITICAL]
+> ### STRICT BAN ON MCP TOOLS (`mcp-atlassian`)
+> **NEVER CALL ANY TOOL FROM THE `mcp-atlassian` MCP SERVER** (`jira_get_issue`, `jira_search`, `jira_transition_issue`, `jira_add_worklog`, etc.).
+> Calling Jira VNPT through MCP triggers server-side rate limits (`HTTP 401: OTP_REQUIRED`), wastes LLM context, and fails.
+> **All Jira actions MUST be executed by running the Python scripts below via terminal.**
 
-- Target: **Jira Server / Data Center 8.22** (self-hosted, `cntt.vnpt.vn`).
-- Scripts resolve configuration from `.env` in the workspace or skill directory.
-- Supports **Personal Access Token (`JIRA_PAT`)**, **Session Cookie (`JIRA_COOKIE`)**, or **Basic Auth**.
+---
 
-## Global rules (always apply)
+## Script Paths & Universal Execution
+
+The scripts are installed in the skill's `scripts/` folder.
+Whenever you are working in **any workspace**, run the scripts via terminal using their path:
+
+```bash
+# Run using the skill's script path or relative path:
+python scripts/<script_name>.py [args...]
+
+# Or when working outside the skill folder, execute using the installed skill path:
+python "<skill_dir>/scripts/<script_name>.py" [args...]
+```
+
+Credentials are automatically loaded from:
+1. Workspace `.env` (if present)
+2. Skill folder `.env`
+3. Global environment variables (`JIRA_BASE_URL`, `JIRA_PAT`, `JIRA_COOKIE`, etc.)
+
+---
+
+## Global Rules
 
 1. **Confirm before any WRITE.** Writes = `transition_task.py`, `create_task.py`, `edit_task.py`, `log_work.py`, `submit_timesheet.py`.
-   Before writing: show exactly what will change (issue key, field, old→new / hours / target status), then ask for a yes. Read tools never need confirmation.
-2. **Auto-verification after write.** Every write script automatically re-fetches the issue and verifies the state (e.g. status/resolution or worklog ID). Report the verified result to the user.
-3. **Optimized Transitions & Caching:** `transition_task.py` caches transition IDs (e.g. Open -> Resolved = `131` with `resolution=Done`) in `transitions_cache.json`. Transitions execute in a single HTTP request without repeated discovery round-trips.
-4. **Reliability & Rate-limit Handling:** Built into `jira_api.py`. Rapid requests to `cntt.vnpt.vn` return 401/OTP if called too fast; the client automatically backs off (15s) and retries.
-5. **Prefer portable CLI execution:** Run scripts via terminal (`python scripts/<script>.py ...`). Do not invoke MCP tools.
+   Before writing: show exactly what will change (issue keys, old→new status/resolution/fields), then ask for user confirmation. Read scripts never need confirmation.
+2. **Auto-verification after write.** Every write script automatically re-fetches the issue from Jira and verifies the result.
+3. **Multi-key batch operations:** Both `view_task.py` and `transition_task.py` accept **multiple keys at once** (e.g. `CCDT-33 CCDT-43 CCDT-103`).
+   - `view_task.py` automatically aggregates all keys into a single JQL query (`key in (...)`), turning N requests into **1 single HTTP request** to prevent triggering WAF burst limits.
+   - `transition_task.py` prefetches statuses in 1 call to instantly skip already resolved tasks, and uses a default `--delay 6.0s` between task transitions.
+4. **Transition Caching:** `transition_task.py` uses `transitions_cache.json` (e.g. `Open -> Resolved` = ID `131` with `resolution=Done`). Transitions execute in 1 single HTTP request.
+5. **Rate-limit Protection:** Handled transparently by `jira_api.py` with baseline throttle, browser User-Agent, and automatic 20s exponential backoff retry on 401/429.
+6. **Authentication for VNPT Jira (MFA):** Do not rely on PAT if blocked by MFA gateway. Use `JIRA_COOKIE` (`JSESSIONID`) from active browser session. `jira_api.py` automatically binds the cookie to the exact host domain.
 
-## Workflow router & Script reference
+---
 
-| User intent | Script command | Reference doc |
-|-------------|----------------|---------------|
-| **List my open tasks** | `python scripts/list_tasks.py --mine` | `references/query.md` |
-| **Filter tasks by project / JQL** | `python scripts/list_tasks.py -p CCDT --due 3d` | `references/query.md` |
-| **View details, comments, download attachments** | `python scripts/view_task.py CCDT-99 -d` | `references/query.md` |
-| **Fast Transition / Resolve / Close** | `python scripts/transition_task.py CCDT-99 --to resolve` | `references/transition-close.md` |
-| **Create new issue / Sub-task** | `python scripts/create_task.py "Tiêu đề" -p CCDT -t Bug` | `references/create-edit.md` |
-| **Edit fields (Assignee, Due, Priority...)** | `python scripts/edit_task.py CCDT-99 -a tttruong --due 2026-09-30` | `references/create-edit.md` |
-| **Log work (Single / Full week 40h)** | `python scripts/log_work.py --week --key CCDT-45` | `references/logwork.md` |
-| **Check timesheet & week logwork** | `python scripts/check_worklog.py` | `references/logwork.md` |
-| **Export project to styled Excel** | `python scripts/export_excel.py CCDT` | `references/query.md` |
+## Workflow Router & CLI Commands
 
-## Configuration & Portability
+### 1. Check / View Tasks (Single or Batch)
+```bash
+# Check status, description, and comments of one or more tasks:
+python scripts/view_task.py CCDT-33 CCDT-43 CCDT-103
 
-- `.env.example` — Copy to `.env` in any folder to carry this tool suite anywhere.
-- `assets/project-profiles.json` — Per-project defaults for issue creation.
+# View and download attachments locally:
+python scripts/view_task.py CCDT-99 -d
+```
+
+### 2. Transition / Resolve / Close Tasks (Single or Batch)
+```bash
+# Fast Resolve batch tasks (sets Status = Resolved, Resolution = Done):
+python scripts/transition_task.py CCDT-33 CCDT-43 CCDT-103 --to resolve
+
+# Fast Close batch tasks:
+python scripts/transition_task.py CCDT-33 CCDT-43 CCDT-103 --to close
+
+# Inspect available transitions from an issue's current status:
+python scripts/transition_task.py CCDT-33 --list
+```
+
+### 3. List & Filter Tasks
+```bash
+# My open/unresolved tasks:
+python scripts/list_tasks.py --mine
+
+# Unresolved tasks in project CCDT:
+python scripts/list_tasks.py -p CCDT --due 3d
+
+# Custom JQL query:
+python scripts/list_tasks.py --jql "key in (CCDT-33, CCDT-43) ORDER BY updated DESC"
+```
+
+### 4. Create & Edit Issues
+```bash
+# Create issue from profile:
+python scripts/create_task.py "Tiêu đề" -p CCDT -t Bug -a tttruong
+
+# Edit fields:
+python scripts/edit_task.py CCDT-99 -a tttruong --due 2026-09-30
+```
+
+### 5. Log Work & Timesheets
+```bash
+# Auto full week 40h logwork:
+python scripts/log_work.py --week --key CCDT-45 --yes
+
+# Check weekly logged hours & Tempo approval (current week or last week):
+python scripts/check_worklog.py
+python scripts/check_worklog.py -w 1
+
+# Submit timesheet to manager (default: nghialt.tgg):
+python scripts/submit_timesheet.py nghialt.tgg "Gửi anh duyệt chấm công" --last-week --yes
+```
+
+### 6. Export Project to Styled Excel
+```bash
+python scripts/export_excel.py CCDT
+```
+

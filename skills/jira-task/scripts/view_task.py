@@ -99,12 +99,35 @@ def main():
     client = JiraClient()
     fields = "summary,description,comment,attachment,status,assignee,reporter,created,updated,priority,issuetype,parent,subtasks"
 
-    for key in args.keys:
-        clean_key = key.strip().replace(",", "").upper()
-        if not clean_key:
-            continue
+    clean_keys = []
+    for k in args.keys:
+        for sub_k in k.replace(",", " ").split():
+            clean = sub_k.strip().upper()
+            if clean and clean not in clean_keys:
+                clean_keys.append(clean)
+
+    if not clean_keys:
+        return
+
+    # Optimization: If multiple keys requested, fetch all via 1 single JQL search request
+    # This prevents WAF burst-rate-limiting by turning N requests into 1 request.
+    issues_by_key = {}
+    if len(clean_keys) > 1:
         try:
-            issue = client.get_issue(clean_key, fields=fields)
+            jql = f"key in ({', '.join(clean_keys)})"
+            res = client.search_issues(jql, fields=fields, max_results=len(clean_keys) + 10)
+            for iss in res.get("issues", []):
+                issues_by_key[iss.get("key", "").upper()] = iss
+        except Exception as e:
+            # Fallback to individual get_issue if JQL search fails
+            pass
+
+    for clean_key in clean_keys:
+        try:
+            issue = issues_by_key.get(clean_key)
+            if not issue:
+                issue = client.get_issue(clean_key, fields=fields)
+
             if args.json:
                 print(json.dumps(issue, ensure_ascii=False, indent=2))
             else:
