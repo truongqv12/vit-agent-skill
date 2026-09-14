@@ -62,6 +62,14 @@ def main():
         print(f" Parent     : {args.parent.upper()}")
     print("=" * 80)
 
+    due_date = args.due
+    if not due_date and proj_key == "CCDT":
+        import calendar
+        from datetime import date
+        today = date.today()
+        _, last_day = calendar.monthrange(today.year, today.month)
+        due_date = f"{today.year:04d}-{today.month:02d}-{last_day:02d}"
+
     try:
         res = client.create_issue(
             project_key=proj_key,
@@ -71,7 +79,7 @@ def main():
             assignee=args.assignee or client.username,
             priority=args.priority,
             components=components,
-            duedate=args.due,
+            duedate=due_date,
             additional_fields=additional_fields if additional_fields else None
         )
         key = res.get("key")
