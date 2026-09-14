@@ -36,7 +36,9 @@ def main():
 
     issue_type = args.type or proj_cfg.get("default_issue_type", "Task")
     if args.parent and not args.type:
-        issue_type = "Sub-task"
+        issue_type = "Sub-Task"
+    elif issue_type.lower() in ("sub-task", "subtask"):
+        issue_type = "Sub-Task"
 
     components = args.components if args.components is not None else proj_cfg.get("components", [])
 
