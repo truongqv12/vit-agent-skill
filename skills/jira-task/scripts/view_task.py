@@ -2,12 +2,26 @@ import os
 import sys
 import json
 import argparse
+import requests
 from jira_api import JiraClient
 
 def download_file(url, output_path, client):
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    res = client.session.get(url, stream=True, timeout=30)
-    if res.ok:
+    # Tải attachment bằng request SẠCH cookie: cookie phiên (do search_issues/login
+    # xoay vòng và dính vào client.session) khiến VNPT Server ưu tiên cookie hơn
+    # basic-auth và redirect sang OtpAction.jspa (trả text/html thay vì binary).
+    # Lưu ý: session.get(url, cookies={}) KHÔNG đủ vì requests vẫn merge cookie của
+    # session, nên phải dùng requests.get() độc lập với session.
+    headers = {"User-Agent": client.session.headers.get("User-Agent", "")}
+    auth = None
+    if client.pat and client.pat not in (client.password, "your_token"):
+        headers["Authorization"] = f"Bearer {client.pat}"
+    elif client.username and client.password:
+        auth = (client.username, client.password)
+    res = requests.get(url, auth=auth, headers=headers, stream=True,
+                       timeout=30, verify=client.verify_ssl)
+    ctype = res.headers.get("Content-Type", "")
+    if res.ok and "text/html" not in ctype:
         with open(output_path, "wb") as f:
             for chunk in res.iter_content(chunk_size=8192):
                 f.write(chunk)
@@ -97,7 +111,7 @@ def main():
     args = parser.parse_args()
 
     client = JiraClient()
-    fields = "summary,description,comment,attachment,status,assignee,reporter,created,updated,priority,issuetype,parent,subtasks"
+    fields = "summary,description,comment,attachment,status,assignee,reporter,created,updated,priority,issuetype,parent,subtasks,duedate"
 
     clean_keys = []
     for k in args.keys:
