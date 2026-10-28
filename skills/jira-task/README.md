@@ -20,7 +20,8 @@ script workflows. This README carries provenance, configuration, and portability
 - **Query & View**: List tasks (`list_tasks.py`), view issue details and download
   attachments (`view_task.py`), and export styled Excel reports (`export_excel.py`).
 - **Issue Lifecycle**: Fast transition / resolve / close with transition ID caching
-  (`transition_task.py`), create issues (`create_task.py`), and update fields (`edit_task.py`).
+  (`transition_task.py`), create issues (`create_task.py`), update fields (`edit_task.py`),
+  comment on issues (`comment_task.py`), and link issues (`link_task.py`).
 - **Worklog & Timesheet**: Log single worklog or auto-fill weekly 40h worklogs
   (`log_work.py`), check weekly timesheets (`check_worklog.py`), and submit timesheets
   to reviewers (`submit_timesheet.py`).

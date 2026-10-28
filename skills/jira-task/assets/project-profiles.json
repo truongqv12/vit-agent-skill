@@ -4,10 +4,12 @@
   "profiles": {
     "CCDT": {
       "project_key": "CCDT",
-      "default_issue_type": "Bug",
+      "default_issue_type": "Task",
       "components": [],
       "default_additional_fields": {
-        "labels": ["web"]
+        "labels": ["web"],
+        "customfield_13000": {"id": "13000"},
+        "customfield_13100": {"id": "24604", "child": {"id": "25000"}}
       },
       "notes": "Công chứng số. Adjust default_issue_type to Task/Sub-task per need. Confirm components/labels against the live project before relying on them."
     }

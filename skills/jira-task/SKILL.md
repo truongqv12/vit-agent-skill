@@ -7,7 +7,7 @@ category: productivity
 keywords: [jira, script, python, worklog, logwork, transition, resolve, requirements, task, subtask, vnpt, ccdt]
 metadata:
   author: opencode
-  version: "3.1.0"
+  version: "3.2.0"
   portability: standalone
 ---
 
@@ -43,7 +43,7 @@ Credentials are automatically loaded from:
 
 ## Global Rules
 
-1. **Confirm before any WRITE.** Writes = `transition_task.py`, `create_task.py`, `edit_task.py`, `log_work.py`, `submit_timesheet.py`.
+1. **Confirm before any WRITE.** Writes = `transition_task.py`, `create_task.py`, `edit_task.py`, `comment_task.py`, `link_task.py`, `log_work.py`, `submit_timesheet.py`.
    Before writing: show exactly what will change (issue keys, old→new status/resolution/fields), then ask for user confirmation. Read scripts never need confirmation.
 2. **Auto-verification after write.** Every write script automatically re-fetches the issue from Jira and verifies the result.
 3. **Multi-key batch operations:** Both `view_task.py` and `transition_task.py` accept **multiple keys at once** (e.g. `CCDT-33 CCDT-43 CCDT-103`).
@@ -97,7 +97,16 @@ python scripts/create_task.py "Tiêu đề" -p CCDT -t Bug -a tttruong
 
 # Edit fields:
 python scripts/edit_task.py CCDT-99 -a tttruong --due 2026-09-30
+
+# Comment on one or more issues (2s delay between calls):
+python scripts/comment_task.py CCDT-391 CCDT-392 -m "Đã fix trên dev, nhờ QA kiểm lại"
+
+# Link a source issue to targets (default type "Relates"):
+python scripts/link_task.py CCDT-430 CCDT-391 CCDT-392 --type Relates
 ```
+
+Profile `default_additional_fields` (e.g. labels, required custom fields) are applied to every
+`create_task.py` call; `--labels` overrides only the labels.
 
 ### 5. Log Work & Timesheets
 ```bash

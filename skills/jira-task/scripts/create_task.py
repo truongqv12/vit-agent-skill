@@ -43,10 +43,11 @@ def main():
     components = args.components if args.components is not None else proj_cfg.get("components", [])
 
     additional_fields = {}
+    if "default_additional_fields" in proj_cfg:
+        additional_fields.update(proj_cfg["default_additional_fields"])
+
     if args.labels:
         additional_fields["labels"] = args.labels
-    elif "default_additional_fields" in proj_cfg and "labels" in proj_cfg["default_additional_fields"]:
-        additional_fields["labels"] = proj_cfg["default_additional_fields"]["labels"]
 
     if args.parent:
         additional_fields["parent"] = {"key": args.parent.upper()}

@@ -359,3 +359,21 @@ class JiraClient:
         if res.status_code in (200, 204):
             return True
         raise RuntimeError(f"Update issue {key} failed ({res.status_code}): {res.text}")
+
+    def add_comment(self, key, comment):
+        res = self.post(f"/rest/api/latest/issue/{key}/comment", json={"body": comment})
+        if res.status_code in (200, 201):
+            return res.json()
+        raise RuntimeError(f"Add comment to {key} failed ({res.status_code}): {res.text}")
+
+    def link_issues(self, inward_key, outward_key, link_type="Relates"):
+        payload = {
+            "type": {"name": link_type},
+            "inwardIssue": {"key": inward_key},
+            "outwardIssue": {"key": outward_key}
+        }
+        res = self.post("/rest/api/latest/issueLink", json=payload)
+        if res.status_code in (200, 201, 204):
+            return True
+        raise RuntimeError(f"Link issues {inward_key} -> {outward_key} failed ({res.status_code}): {res.text}")
+
