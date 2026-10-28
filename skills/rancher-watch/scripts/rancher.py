@@ -3,13 +3,14 @@
 
   python scripts/rancher.py deployments [-n NS]
   python scripts/rancher.py pods [-n NS] [--deployment NAME]
-  python scripts/rancher.py watch DEPLOY[=TAG] [DEPLOY[=TAG] ...] [--image-tag TAG] [--timeout 15]
-  python scripts/rancher.py logs TARGET [--since 30m] [--tail 200] [--previous] [--grep REGEX]
+  python scripts/rancher.py watch DEPLOY[=TAG] [DEPLOY[=TAG] ...] [--image-tag TAG] [--timeout 15] [--settle 60]
+  python scripts/rancher.py logs TARGET [--since 30m] [--tail 200] [--previous] [--grep REGEX | --sql-errors]
   python scripts/rancher.py events [--for NAME] [--all]
   python scripts/rancher.py config DEPLOY [--grep REGEX]
 
-TARGET là tên pod hoặc tên deployment (lấy log mọi pod của deployment). Thêm --json để máy đọc.
-Mã thoát: 0 = ổn, 1 = rollout lỗi hoặc hết giờ, 2 = lỗi cấu hình/kết nối/quyền.
+TARGET là tên pod hoặc tên deployment (lấy log mọi pod của deployment). Thêm --json để máy đọc,
+--profile NAME để dùng Rancher khác (.env.NAME).
+Mã thoát: 0 = ổn, 1 = rollout lỗi, hết giờ hoặc log có lỗi SQL, 2 = lỗi cấu hình/kết nối/quyền.
 """
 
 from __future__ import annotations
@@ -36,7 +37,17 @@ URL_PASSWORD = re.compile(r"(//[^/:@\s]+:)[^@/\s]+@")
 # Giá trị trông như khoá/token dù tên biến vô hại: chuỗi dài liền mạch kiểu base64/hex có cả chữ lẫn số.
 OPAQUE_VALUE = re.compile(r"^(?=.*[A-Za-z])(?=.*\d)[A-Za-z0-9+/=_.-]{24,}$")
 PEM = re.compile(r"-----BEGIN [A-Z ]+-----")
-MASK = "***"
+# Khác hẳn mọi giá trị thật (kể cả "*" hay "***") để người đọc biết là đã che.
+MASK = "<masked>"
+# Lỗi schema/SQL lúc chạy: dấu hiệu bản mới cần migration mà DB chưa chạy (môi trường tắt Flyway).
+SQL_ERROR = re.compile(
+    r"BadSqlGrammarException|SQLGrammarException|SQLSyntaxErrorException|PSQLException"
+    r"|relation \"[^\"]+\" does not exist|column \"?[\w.]+\"? (of relation \"[^\"]+\" )?does not exist"
+    r"|no unique or exclusion constraint|Schema-validation:|FlywayValidateException"
+    r"|Validate failed: Migrations|Detected (resolved|applied) migration not (applied|resolved)", re.I)
+TIMESTAMP = re.compile(r"\d{4}-\d\d-\d\dT[\d:.]+(Z|[+-]\d\d:?\d\d)?\s*")
+FLYWAY_SWITCH = re.compile(r"^(SPRING_)?FLYWAY_ENABLED$", re.I)
+SQL_ERROR_LINES = 8
 
 
 def mask_value(key: str, value: str | None) -> str | None:
@@ -56,11 +67,33 @@ def parse_since(text: str | None) -> int | None:
     return int(m.group(1)) * {"": 1, "s": 1, "m": 60, "h": 3600, "d": 86400}[m.group(2)]
 
 
+def sql_errors(text: str, limit: int = SQL_ERROR_LINES) -> list[str]:
+    """Dòng log lỗi SQL/schema, bỏ trùng (khác nhau mỗi timestamp/thread vẫn tính là một)."""
+    seen, out = set(), []
+    for line in text.splitlines():
+        if not SQL_ERROR.search(line):
+            continue
+        clean = TIMESTAMP.sub("", line).strip()
+        key = re.sub(r"\[[^\]]*\]|\d+", "", clean)
+        if key not in seen:
+            seen.add(key)
+            out.append(clean[:400])
+            if len(out) >= limit:
+                break
+    return out
+
+
+def age_seconds(ts: str | None) -> int:
+    if not ts:
+        return 0
+    start = dt.datetime.strptime(ts, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=dt.timezone.utc)
+    return int((dt.datetime.now(dt.timezone.utc) - start).total_seconds())
+
+
 def age(ts: str | None) -> str:
     if not ts:
         return "-"
-    start = dt.datetime.strptime(ts, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=dt.timezone.utc)
-    s = int((dt.datetime.now(dt.timezone.utc) - start).total_seconds())
+    s = age_seconds(ts)
     if s < 3600:
         return f"{s // 60}m{s % 60:02d}s"
     if s < 86400:
@@ -182,6 +215,23 @@ class Ops:
     def secret_keys(self, name: str) -> list[str]:
         # Chỉ lấy tên key; giá trị secret không bao giờ được giữ lại hay in ra.
         return sorted((self.c.k8s(f"api/v1/namespaces/{self.ns}/secrets/{name}").get("data") or {}).keys())
+
+    def flyway_disabled(self, name: str) -> bool:
+        """True khi deployment đặt FLYWAY_ENABLED / SPRING_FLYWAY_ENABLED = false (env hoặc ConfigMap)."""
+        values = []
+        for c in self.raw_deployment(name)["spec"]["template"]["spec"]["containers"]:
+            for e in c.get("env") or []:
+                if FLYWAY_SWITCH.match(e["name"]):
+                    ref = (e.get("valueFrom") or {}).get("configMapKeyRef")
+                    values.append(self.configmap(ref["name"]).get(ref["key"]) if ref else e.get("value"))
+            for ef in c.get("envFrom") or []:
+                if "configMapRef" in ef:
+                    try:
+                        data = self.configmap(ef["configMapRef"]["name"])
+                    except RancherError:
+                        continue
+                    values += [v for k, v in data.items() if FLYWAY_SWITCH.match(ef.get("prefix", "") + k)]
+        return any(str(v).strip().lower() == "false" for v in values)
 
     def pods_of(self, target: str) -> list[dict]:
         """Tên pod cụ thể, hoặc tên deployment -> mọi pod của nó."""
@@ -311,6 +361,7 @@ def cmd_watch(ops: Ops, args) -> int:
         if pending:
             time.sleep(args.interval)
 
+    scan_sql_errors(ops, results, args, deadline)
     ok = all(r["status"] == "OK" for r in results.values())
     if args.json:
         print(json.dumps(results, ensure_ascii=False, indent=2, default=str))
@@ -319,9 +370,49 @@ def cmd_watch(ops: Ops, args) -> int:
         i = r["info"]
         print(f"{name}: {r['status']} | tag {i['tag']} | ready {i['ready']}/{i['desired']}"
               + (f" | {r['reason']}" if r.get("reason") else ""))
-        if r["status"] != "OK":
+        for line in r.get("sql_errors", []):
+            print(f"  [sql] {line}")
+        if r.get("manual_migrations"):
+            print("  lưu ý: deployment tắt Flyway, migration phải chạy SQL tay"
+                  + (" — kiểm migration mới của service này đã chạy trên DB chưa." if r["status"] == "SQL_ERROR"
+                     else f"; {args.settle}s đầu chưa thấy lỗi SQL."))
+        for note in r.get("notes", []):
+            print(f"  lưu ý: {note}")
+        if r["status"] in ("FAILED", "TIMEOUT"):
             print_diagnosis(r["diagnosis"])
     return 0 if ok else 1
+
+
+def scan_sql_errors(ops: Ops, results: dict, args, deadline: float) -> None:
+    """Pod Ready chưa đủ: môi trường tắt Flyway vẫn lên bản mới dù DB thiếu migration, lỗi chỉ hiện trong log.
+
+    Chờ pod mới chạy đủ --settle giây (không quá hạn --timeout) rồi quét log tìm lỗi SQL/schema.
+    """
+    done = {n: r for n, r in results.items() if r["status"] == "OK"}
+    if not done:
+        return
+    pods = {n: [p for p in ops.pods(r["info"]["selector"]) if p["spec_image"] == r["info"]["image"]]
+            for n, r in done.items()}
+    youngest = min((age_seconds(p["started"]) for ps in pods.values() for p in ps), default=args.settle)
+    wait = min(args.settle - youngest, deadline - time.time())
+    if wait > 0:
+        if not args.json:
+            print(f"  … chờ {int(wait)}s cho pod mới chạy đủ {args.settle}s rồi quét log lỗi SQL", flush=True)
+        time.sleep(wait)
+    for name, r in done.items():
+        try:
+            r["manual_migrations"] = ops.flyway_disabled(name)
+        except RancherError as e:
+            r.setdefault("notes", []).append(f"không đọc được cấu hình Flyway: {e}")
+        text = []
+        for p in pods[name]:
+            try:
+                text.append(ops.log(p["name"], args.scan_tail, None, previous=False))
+            except RancherError as e:
+                r.setdefault("notes", []).append(f"không đọc được log {p['name']}: {e}")
+        errors = sql_errors("\n".join(text))
+        if errors:
+            r.update(status="SQL_ERROR", reason="log pod mới có lỗi SQL/schema", sql_errors=errors)
 
 
 def env_source(e: dict) -> dict:
@@ -447,7 +538,7 @@ def cmd_config(ops: Ops, args) -> int:
 
 def cmd_logs(ops: Ops, args) -> int:
     since = parse_since(args.since)
-    rx = re.compile(args.grep, re.I) if args.grep else None
+    rx = SQL_ERROR if args.sql_errors else re.compile(args.grep, re.I) if args.grep else None
     for p in ops.pods_of(args.target):
         text = ops.log(p["name"], args.tail, since, args.previous)
         lines = [ln for ln in text.splitlines() if not rx or rx.search(ln)]
@@ -472,6 +563,7 @@ def main() -> int:
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("-n", "--namespace", help="namespace (mặc định RANCHER_NAMESPACE)")
     common.add_argument("--json", action="store_true", help="in JSON")
+    common.add_argument("--profile", help="Rancher khác: đọc .env.<profile> (mặc định RANCHER_PROFILE hoặc .env)")
     ap = argparse.ArgumentParser(description="Rancher: theo dõi deploy, chỉ đọc.")
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub_parser = lambda name, **kw: sub.add_parser(name, parents=[common], **kw)  # noqa: E731
@@ -487,13 +579,18 @@ def main() -> int:
     p.add_argument("--timeout", type=int, default=15, help="phút chờ tối đa (mặc định 15)")
     p.add_argument("--interval", type=int, default=10, help="giây giữa hai lần hỏi (mặc định 10)")
     p.add_argument("--log-tail", type=int, default=60, help="số dòng log in kèm khi lỗi")
+    p.add_argument("--settle", type=int, default=60,
+                   help="giây pod mới phải chạy trước khi quét log lỗi SQL (mặc định 60, 0 = quét ngay)")
+    p.add_argument("--scan-tail", type=int, default=3000, help="số dòng log cuối mỗi pod để quét lỗi SQL")
 
     p = sub_parser("logs", help="log pod hoặc mọi pod của deployment")
     p.add_argument("target")
     p.add_argument("--since", help="vd 30m, 2h")
     p.add_argument("--tail", type=int, default=200)
     p.add_argument("--previous", action="store_true", help="log của container trước khi restart")
-    p.add_argument("--grep", help="chỉ giữ dòng khớp regex (không phân biệt hoa thường)")
+    group = p.add_mutually_exclusive_group()
+    group.add_argument("--grep", help="chỉ giữ dòng khớp regex (không phân biệt hoa thường)")
+    group.add_argument("--sql-errors", action="store_true", help="chỉ giữ dòng lỗi SQL/schema (như watch quét)")
 
     p = sub_parser("config", help="cấu hình đang áp dụng: env, envFrom, mount (che secret)")
     p.add_argument("deployment")
@@ -507,7 +604,7 @@ def main() -> int:
     args = ap.parse_args()
     client = None
     try:
-        client = RancherClient()
+        client = RancherClient(profile=args.profile)
         ops = Ops(client, args.namespace or client.default_namespace)
         return {"deployments": cmd_deployments, "pods": cmd_pods, "watch": cmd_watch,
                 "logs": cmd_logs, "events": cmd_events, "config": cmd_config}[args.cmd](ops, args)

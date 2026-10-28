@@ -44,7 +44,7 @@ def load_config() -> dict:
     merged.update(_read_env_file(os.path.join(SKILL_DIR, ".env")))
     merged.update(_read_env_file(os.path.join(os.getcwd(), ".env")))
     for key in ("JENKINS_URL", "JENKINS_USER", "JENKINS_API_TOKEN", "JENKINS_PASSWORD",
-                "JENKINS_DEFAULT_VIEW", "JENKINS_INSECURE"):
+                "JENKINS_DEFAULT_VIEW", "JENKINS_INSECURE", "JENKINS_MANUAL_SQL_JOBS"):
         if os.environ.get(key):
             merged[key] = os.environ[key]
     if not merged.get("JENKINS_URL"):
@@ -59,6 +59,8 @@ class JenkinsClient:
         cfg = config or load_config()
         self.base = cfg["JENKINS_URL"].rstrip("/")
         self.default_view = cfg.get("JENKINS_DEFAULT_VIEW", "")
+        # Regex tên job deploy lên môi trường không tự chạy migration (Flyway tắt).
+        self.manual_sql_jobs = cfg.get("JENKINS_MANUAL_SQL_JOBS", "")
         secret = cfg.get("JENKINS_API_TOKEN") or cfg.get("JENKINS_PASSWORD")
         self._auth = "Basic " + base64.b64encode(f"{cfg['JENKINS_USER']}:{secret}".encode()).decode()
         self._uses_password = not cfg.get("JENKINS_API_TOKEN")

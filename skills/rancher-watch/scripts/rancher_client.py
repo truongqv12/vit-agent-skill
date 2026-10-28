@@ -39,24 +39,34 @@ def _read_env_file(path: str) -> dict:
     return values
 
 
-def load_config() -> dict:
-    """Thứ tự ưu tiên: biến môi trường > .env ở thư mục đang đứng > .env của skill."""
+def load_config(profile: str | None = None) -> dict:
+    """Không profile: biến môi trường > .env ở thư mục đang đứng > .env của skill.
+
+    Có profile (mỗi Rancher một profile, vd `prod`): chỉ đọc .env.<profile> của skill rồi của thư mục
+    đang đứng, bỏ qua biến môi trường RANCHER_* để không lỡ trỏ sang Rancher khác.
+    """
+    profile = profile or os.environ.get("RANCHER_PROFILE") or None
+    name = f".env.{profile}" if profile else ".env"
     merged = {"RANCHER_CLUSTER": "local"}
-    merged.update(_read_env_file(os.path.join(SKILL_DIR, ".env")))
-    merged.update(_read_env_file(os.path.join(os.getcwd(), ".env")))
-    for key in KEYS:
-        if os.environ.get(key):
-            merged[key] = os.environ[key]
+    found = [p for p in (os.path.join(SKILL_DIR, name), os.path.join(os.getcwd(), name)) if os.path.isfile(p)]
+    for path in found:
+        merged.update(_read_env_file(path))
+    if profile and not found:
+        raise RancherError(f"Không thấy file {name} cho profile '{profile}' (đặt trong thư mục skill).")
+    if not profile:
+        for key in KEYS:
+            if os.environ.get(key):
+                merged[key] = os.environ[key]
     if not merged.get("RANCHER_URL"):
-        raise RancherError("Thiếu RANCHER_URL (đặt trong .env của skill hoặc biến môi trường).")
+        raise RancherError(f"Thiếu RANCHER_URL (đặt trong {name} của skill hoặc biến môi trường).")
     if not merged.get("RANCHER_TOKEN") and not (merged.get("RANCHER_USER") and merged.get("RANCHER_PASSWORD")):
         raise RancherError("Thiếu RANCHER_TOKEN (hoặc cặp RANCHER_USER/RANCHER_PASSWORD).")
     return merged
 
 
 class RancherClient:
-    def __init__(self, config: dict | None = None):
-        cfg = config or load_config()
+    def __init__(self, config: dict | None = None, profile: str | None = None):
+        cfg = config or load_config(profile)
         self.base = cfg["RANCHER_URL"].rstrip("/")
         self.cluster = cfg["RANCHER_CLUSTER"]
         self.default_namespace = cfg.get("RANCHER_NAMESPACE", "")

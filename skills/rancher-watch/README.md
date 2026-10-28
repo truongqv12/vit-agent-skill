@@ -14,6 +14,8 @@ covers provenance, setup and portability.
   project/namespace access and no kubeconfig.
 - Never mutates the cluster. Secret values are never printed (`config` lists Secret key names
   only and masks sensitive literals).
+- `watch` also scans the new pods' logs for SQL/schema errors, because environments that run
+  migrations by hand stay Ready when a migration was forgotten.
 - Offline logic tests: `python scripts/test_rancher.py`.
 
 ## Configuration
@@ -26,6 +28,9 @@ RANCHER_TOKEN=token-xxxxx:<secret>
 RANCHER_CLUSTER=local
 RANCHER_NAMESPACE=ccdt-dev
 ```
+
+A second Rancher server (for example demo and production) goes in `.env.prod` with the same keys
+and is selected with `--profile prod`. Both files are git-ignored.
 
 Create a key at **avatar → Account & API Keys → Create API Key**. Scope it to the cluster and
 set an expiry. Accounts on the local auth provider can use `RANCHER_USER` / `RANCHER_PASSWORD`

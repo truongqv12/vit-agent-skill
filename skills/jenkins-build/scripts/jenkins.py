@@ -207,6 +207,11 @@ def cmd_build(client: JenkinsClient, args) -> int:
     if prod and not args.allow_prod:
         raise JenkinsError("Job production cần --allow-prod (chỉ dùng khi người dùng yêu cầu rõ build production): "
                            + ", ".join(prod))
+    manual_sql = [j for j in args.jobs if client.manual_sql_jobs and re.search(client.manual_sql_jobs, j, re.I)]
+    if manual_sql and not args.json:
+        print("CHÚ Ý: môi trường của " + ", ".join(manual_sql) + " không tự chạy migration. Bản mới có migration "
+              "mà chưa chạy SQL tay thì pod vẫn Ready nhưng lỗi SQL lúc chạy; kiểm deploy bằng rancher-watch `watch`.",
+              flush=True)
     deadline = time.time() + args.timeout * 60
     started = []
     for job in args.jobs:

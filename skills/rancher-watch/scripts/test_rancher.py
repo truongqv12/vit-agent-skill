@@ -11,7 +11,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from rancher import (MASK, deployment_info, image_tag, mask_value, parse_since, pod_failure,  # noqa: E402
-                     pod_info, rollout_done)
+                     pod_info, rollout_done, sql_errors)
 
 
 def pod(waiting=None, restarts=0, last_reason=None, phase="Running", ready=False):
@@ -87,13 +87,40 @@ class MaskTest(unittest.TestCase):
         self.assertEqual(mask_value("X", "-----BEGIN PRIVATE KEY-----\nabc"), MASK)
 
     def test_url_password_is_masked_but_url_kept(self):
-        self.assertEqual(mask_value("DB_URL", "postgresql://app:s3cr3t@db:5432/x"), "postgresql://app:***@db:5432/x")
+        self.assertEqual(mask_value("DB_URL", "postgresql://app:s3cr3t@db:5432/x"),
+                         f"postgresql://app:{MASK}@db:5432/x")
+
+    def test_mask_is_distinct_from_literal_stars(self):
+        self.assertEqual(mask_value("SMARTCA_SIGNING_PRICING_CODE", "*"), "*")
+        self.assertNotIn(MASK, ("*", "***"))
 
     def test_plain_config_stays_readable(self):
         for key, value in (("TZ", "Asia/Ho_Chi_Minh"), ("NOTARY_URI", "http://notary:8084"),
                            ("FEATURE_ENABLED", "true"), ("SMARTCA_SIGNING_PRICING_CODE", "1"),
                            ("KEYCLOAK_REALM", "congchung"), ("MONKEY_COUNT", "3")):
             self.assertEqual(mask_value(key, value), value, key)
+
+
+class SqlErrorTest(unittest.TestCase):
+    LOG = "\n".join([
+        "2026-10-28T03:49:40.100Z 2026-10-28T10:49:40.100+07:00  INFO 1 --- [main] Started App in 41.2 seconds",
+        "2026-10-28T03:49:42.815Z 2026-10-28T10:49:42.815+07:00 ERROR 1 --- [scheduling-2] JdbcTemplateStorageAccessor",
+        "org.springframework.jdbc.BadSqlGrammarException: PreparedStatementCallback; bad SQL grammar [INSERT INTO shedlock]",
+        "\tat org.springframework.jdbc.core.JdbcTemplate.translateException(JdbcTemplate.java:1548)",
+        "Caused by: org.postgresql.util.PSQLException: ERROR: there is no unique or exclusion constraint matching",
+        "2026-10-28T03:49:52.815Z org.springframework.jdbc.BadSqlGrammarException: PreparedStatementCallback; bad SQL grammar [INSERT INTO shedlock]",
+        "2026-10-28T03:50:01.000Z ERROR: column \"invite_sent_at\" of relation \"collaborator\" does not exist",
+        "2026-10-28T03:50:02.000Z ERROR: relation \"notary_schema.fee_rule\" does not exist",
+    ])
+
+    def test_detects_and_dedupes_schema_errors(self):
+        found = sql_errors(self.LOG)
+        self.assertEqual(len(found), 4, found)
+        self.assertTrue(found[0].startswith("org.springframework.jdbc.BadSqlGrammarException"))
+        self.assertTrue(any("invite_sent_at" in line for line in found))
+
+    def test_healthy_log_has_no_sql_errors(self):
+        self.assertEqual(sql_errors(self.LOG.splitlines()[0] + "\nWARN user seed not found"), [])
 
 
 class SinceTest(unittest.TestCase):

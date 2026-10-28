@@ -79,7 +79,7 @@ Skills for triggering CI builds and verifying deployments without a browser.
 | Skill | Trigger / outcome | Portability | Runtime contract |
 |---|---|---|---|
 | `jenkins-build` | Trigger and track Jenkins builds over the REST API with an API token, no browser needed. List jobs in a view with their last build, start one or more jobs (with parameters), wait for the result, and report commit, image tag and failing log lines. | `standalone` | [SKILL.md](../../skills/jenkins-build/SKILL.md) · [README](../../skills/jenkins-build/README.md) |
-| `rancher-watch` | Monitor Kubernetes deployments through the Rancher API with an API key, read-only and without a browser. List deployments and pods, show the configuration applied to a service with secrets masked, wait for a rollout to reach a new image tag, and on failure report the cause with pod events and container logs. | `standalone` | [SKILL.md](../../skills/rancher-watch/SKILL.md) · [README](../../skills/rancher-watch/README.md) |
+| `rancher-watch` | Monitor Kubernetes deployments through the Rancher API with an API key, read-only and without a browser. List deployments and pods, show the configuration applied to a service with secrets masked, wait for a rollout to reach a new image tag, flag pods that are Ready but log SQL errors from migrations nobody ran, and on failure report the cause with pod events and container logs. Supports several Rancher servers through profiles. | `standalone` | [SKILL.md](../../skills/rancher-watch/SKILL.md) · [README](../../skills/rancher-watch/README.md) |
 
 ## Pickup rule
 

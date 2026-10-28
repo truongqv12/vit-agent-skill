@@ -25,7 +25,11 @@ JENKINS_URL=https://jenkins.example.com
 JENKINS_USER=your-user
 JENKINS_API_TOKEN=<api-token>
 JENKINS_DEFAULT_VIEW=CCDT-DEV
+JENKINS_MANUAL_SQL_JOBS=(^|_)PROD(_|$)
 ```
+
+`JENKINS_MANUAL_SQL_JOBS` marks jobs whose environment runs database migrations by hand; `build`
+reminds you to run the SQL for them.
 
 Create a token at **User → Configure → API Token → Add new token**. Revoke it there when it is
 no longer needed.
