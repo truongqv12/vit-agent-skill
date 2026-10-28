@@ -72,6 +72,15 @@ Skills for driving external delivery tools such as issue trackers.
 |---|---|---|---|
 | `jira-task` | Work with Jira (VNPT Server 8.22, self-hosted) directly via high-performance standalone Python scripts. Query and list issues, view details with attachments, create and edit issues from project profiles, fast transition and close issues with transition ID caching, and log work across a week. Portable toolkit that works anywhere with a .env file. | `standalone` | [SKILL.md](../../skills/jira-task/SKILL.md) · [README](../../skills/jira-task/README.md) |
 
+## Build & Deploy
+
+Skills for triggering CI builds and verifying deployments without a browser.
+
+| Skill | Trigger / outcome | Portability | Runtime contract |
+|---|---|---|---|
+| `jenkins-build` | Trigger and track Jenkins builds over the REST API with an API token, no browser needed. List jobs in a view with their last build, start one or more jobs (with parameters), wait for the result, and report commit, image tag and failing log lines. | `standalone` | [SKILL.md](../../skills/jenkins-build/SKILL.md) · [README](../../skills/jenkins-build/README.md) |
+| `rancher-watch` | Monitor Kubernetes deployments through the Rancher API with an API key, read-only and without a browser. List deployments and pods, show the configuration applied to a service with secrets masked, wait for a rollout to reach a new image tag, and on failure report the cause with pod events and container logs. | `standalone` | [SKILL.md](../../skills/rancher-watch/SKILL.md) · [README](../../skills/rancher-watch/README.md) |
+
 ## Pickup rule
 
 1. Chọn candidate theo mô tả được lấy trực tiếp từ `SKILL.md`.

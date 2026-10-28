@@ -31,6 +31,11 @@
       "title": "Productivity",
       "description": "Skills for driving external delivery tools such as issue trackers.",
       "skills": ["jira-task"]
+    },
+    {
+      "title": "Build & Deploy",
+      "description": "Skills for triggering CI builds and verifying deployments without a browser.",
+      "skills": ["jenkins-build", "rancher-watch"]
     }
   ]
 }
